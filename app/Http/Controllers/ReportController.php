@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Recovery;
 use App\Models\Sale;
+use App\Models\Salesman;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -407,8 +408,14 @@ class ReportController extends Controller
         if (Auth::id()) {
             $userId = Auth::id();
             $Customers = Customer::where('admin_or_user_id', $userId)->get(); // Adjust according to your database structure
+
+            $Salesmans = Salesman::where('admin_or_user_id', $userId)
+                ->where('designation', 'Saleman')
+                ->get();
+
             return view('admin_panel.reports.date_wise_recovery_report', [
                 'Customers' => $Customers,
+                'Salesmans' => $Salesmans,
             ]);
         } else {
             return redirect()->back();
@@ -417,6 +424,7 @@ class ReportController extends Controller
 
     public function getRecoveryReport(Request $request)
     {
+        $salesman = $request->salesman;
         $type = $request->type;
         $startDate = $request->start_date;
         $endDate = $request->end_date;
@@ -424,7 +432,14 @@ class ReportController extends Controller
         $recoveries = [];
 
         if ($type == 'all' || $type == 'distributor') {
-            $distributorRecoveries = Recovery::whereBetween('date', [$startDate, $endDate])->get();
+            $query = Recovery::whereBetween('date', [$startDate, $endDate]);
+
+            if ($salesman !== 'All') {
+                $query->where('salesman', $salesman);
+            }
+
+            $distributorRecoveries = $query->get();
+
             foreach ($distributorRecoveries as $recovery) {
                 $distributor = Distributor::find($recovery->distributor_ledger_id);
                 $recoveries[] = [
@@ -432,13 +447,21 @@ class ReportController extends Controller
                     'party_name' => $distributor->Customer ?? 'N/A',
                     'area' => $distributor->Area ?? 'N/A',
                     'remarks' => $recovery->remarks,
-                    'amount_paid' => number_format($recovery->amount_paid)
+                    'amount_paid' => number_format($recovery->amount_paid),
+                    'salesman' => $recovery->salesman ?? '-'
                 ];
             }
         }
 
         if ($type == 'all' || $type == 'customer') {
-            $customerRecoveries = CustomerRecovery::whereBetween('date', [$startDate, $endDate])->get();
+            $query = CustomerRecovery::whereBetween('date', [$startDate, $endDate]);
+
+            if ($salesman !== 'All') {
+                $query->where('salesman', $salesman);
+            }
+
+            $customerRecoveries = $query->get();
+
             foreach ($customerRecoveries as $recovery) {
                 $customer = Customer::find($recovery->customer_ledger_id);
                 $recoveries[] = [
@@ -446,13 +469,15 @@ class ReportController extends Controller
                     'party_name' => $customer->customer_name ?? 'N/A',
                     'area' => $customer->area ?? 'N/A',
                     'remarks' => $recovery->remarks,
-                    'amount_paid' => number_format($recovery->amount_paid)
+                    'amount_paid' => number_format($recovery->amount_paid),
+                    'salesman' => $recovery->salesman ?? '-'
                 ];
             }
         }
 
         return response()->json($recoveries);
     }
+
 
     public function date_wise_purcahse_report()
     {
@@ -611,46 +636,61 @@ class ReportController extends Controller
 
     public function fetchReceivableReport(Request $request)
     {
-        $request->validate([
-            'city' => 'required',
-            'area' => 'required|array',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date',
-        ]);
-
         $city = $request->city;
         $areas = $request->area;
         $startDate = $request->start_date;
         $endDate = $request->end_date;
 
-        $customers = DB::table('customers')
-            ->where('city', $city)
-            ->whereIn('area', $areas)
-            ->get();
+        // 🔁 Fetch customers based on city and area
+        $customersQuery = DB::table('customers');
+
+        if ($city !== 'All') {
+            $customersQuery->where('city', $city)->whereIn('area', $areas);
+        }
+
+        $customers = $customersQuery->get();
 
         $reportData = [];
 
         foreach ($customers as $customer) {
-            $salesTotal = DB::table('local_sales')
+            // Step 1: Get opening balance
+            $ledger = DB::table('customer_ledgers')
+                ->where('customer_id', $customer->id)
+                ->select('opening_balance')
+                ->first();
+
+            $openingBalance = $ledger->opening_balance ?? 0;
+
+            // Step 2: Get total sales in selected date range
+            $totalSales = DB::table('local_sales')
                 ->where('customer_id', $customer->id)
                 ->whereBetween('Date', [$startDate, $endDate])
                 ->sum('grand_total');
 
-            $cashReceived = DB::table('customer_recoveries')
+            // Step 3: Get sale returns in selected date range
+            $totalReturns = DB::table('sale_returns')
+                ->where('sale_type', 'customer')
+                ->where('party_id', $customer->id)
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->sum('total_return_amount');
+
+            // Step 4: Get recoveries in selected date range
+            $totalRecoveries = DB::table('customer_recoveries')
                 ->where('customer_ledger_id', $customer->id)
                 ->whereBetween('date', [$startDate, $endDate])
                 ->sum('amount_paid');
 
-            $balance = $salesTotal - $cashReceived;
+            // Step 5: Final balance
+            $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
 
             $reportData[] = [
                 'pcode' => $customer->id,
                 'customer_name' => $customer->customer_name,
                 'address' => $customer->area,
                 'contact' => $customer->phone_number,
-                'balance' => $balance,
-                'cash_rec' => $cashReceived,
-                'remarks' => '', // Optional
+                'balance' => round($balance, 2),
+                'cash_rec' => '', // You can fill this if needed
+                'remarks' => '',
             ];
         }
 

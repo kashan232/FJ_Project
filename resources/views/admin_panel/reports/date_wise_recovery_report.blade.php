@@ -13,8 +13,17 @@
                     <form id="ledgerSearchForm">
                         @csrf
                         <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="salesman" class="form-label">Select Salesman</label>
+                                <select class="form-control" id="salesman" name="salesman" required>
+                                    <option value="All">All</option>
+                                    @foreach($Salesmans as $saleman)
+                                    <option value="{{ $saleman->name }}">{{ $saleman->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                             @if(Auth::check() && Auth::user()->usertype === 'admin')
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="type" class="form-label">Select Type</label>
                                 <select id="type" name="type" class="form-control">
                                     <option value="all">All</option>
@@ -23,7 +32,7 @@
                                 </select>
                             </div>
                             @elseif(Auth::check() && Auth::user()->usertype === 'distributor')
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="type" class="form-label">Select Type</label>
                                 <select id="type" name="type" class="form-control">
                                     <option value="customer">Customer</option>
@@ -31,11 +40,11 @@
                             </div>
                             @endif
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="start_date" class="form-label">Start Date</label>
                                 <input type="date" id="start_date" name="start_date" class="form-control">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="end_date" class="form-label">End Date</label>
                                 <input type="date" id="end_date" name="end_date" class="form-control">
                             </div>
@@ -48,6 +57,7 @@
                     </form>
 
                     <div class="title mt-4">DATE WISE RECOVERY REPORT</div>
+                    <div id="salesmanHeading" class="text-left fw-bold mb-2" style="font-size: 16px;"></div>
                     <table id="recoveryTable">
                         <thead>
                             <tr>
@@ -104,9 +114,9 @@
         margin-bottom: 10px;
     }
 </style>
-
 <script>
     document.getElementById("searchLedger").addEventListener("click", function() {
+        let salesman = document.getElementById("salesman").value;
         let type = document.getElementById("type").value;
         let startDate = document.getElementById("start_date").value;
         let endDate = document.getElementById("end_date").value;
@@ -119,6 +129,7 @@
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
+                    salesman: salesman,
                     type: type,
                     start_date: startDate,
                     end_date: endDate
@@ -126,43 +137,125 @@
             })
             .then(response => response.json())
             .then(data => {
+                const selectedSalesman = document.getElementById("salesman").value;
+                const salesmanHeading = document.getElementById("salesmanHeading");
+                salesmanHeading.innerHTML = selectedSalesman === "All" ? "Salesman: All" : "Salesman: " + selectedSalesman;
+
+                let tableHead = document.querySelector("#recoveryTable thead");
                 let tableBody = document.querySelector("#recoveryTable tbody");
                 tableBody.innerHTML = "";
-                let totalAmount = 0;
 
-                if (data.length > 0) {
-                    data.forEach((item, index) => {
-                        let formattedDate = new Date(item.date).toLocaleDateString("en-GB");
-                        let amount = parseFloat(item.amount_paid.replace(/,/g, '')); // Correct comma issue
-                        totalAmount += amount;
+                if (selectedSalesman !== 'All') {
+                    // Show the main thead
+                    tableHead.style.display = "table-header-group";
 
-                        let row = `<tr>
-                        <td>${index + 1}</td>
-                        <td>${formattedDate}</td>
-                        <td>${item.party_name}</td>
-                        <td>${item.area}</td>
-                        <td>${item.remarks}</td>
-                        <td>${item.amount_paid}</td>
-                    </tr>`;
-                        tableBody.innerHTML += row;
+                    let totalAmount = 0;
+
+                    if (data.length > 0) {
+                        data.forEach((item, index) => {
+                            let formattedDate = new Date(item.date).toLocaleDateString("en-GB");
+                            let amount = parseFloat(item.amount_paid.replace(/,/g, ''));
+                            totalAmount += amount;
+
+                            let row = `<tr>
+                            <td>${index + 1}</td>
+                            <td>${formattedDate}</td>
+                            <td>${item.party_name}</td>
+                            <td>${item.area}</td>
+                            <td>${item.remarks}</td>
+                            <td>${item.amount_paid}</td>
+                        </tr>`;
+                            tableBody.innerHTML += row;
+                        });
+
+                        tableBody.innerHTML += `
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">Total Recovery:</td>
+                            <td class="fw-bold">${totalAmount.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">Total Customers:</td>
+                            <td class="fw-bold">${data.length}</td>
+                        </tr>`;
+                    } else {
+                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No Data Available</td></tr>`;
+                    }
+
+                } else {
+                    // Hide the main static thead for 'All'
+                    tableHead.style.display = "none";
+
+                    if (data.length === 0) {
+                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No Data Available</td></tr>`;
+                        return;
+                    }
+
+                    const grouped = {};
+                    data.forEach(item => {
+                        const sm = item.salesman || 'Unknown';
+                        if (!grouped[sm]) grouped[sm] = [];
+                        grouped[sm].push(item);
                     });
 
+                    let totalRecoveryAll = 0;
+                    let totalCustomersAll = 0;
 
+                    for (const [smName, rows] of Object.entries(grouped)) {
+                        let total = 0;
 
-                    // Fixed: show accurate total recovery
+                        // Group heading
+                        tableBody.innerHTML += `
+                        <tr><td colspan="6" class="fw-bold text-primary">Salesman: ${smName}</td></tr>
+                        <tr>
+                            <th>Voc #</th>
+                            <th>Date</th>
+                            <th>Party Name</th>
+                            <th>Area</th>
+                            <th>Remarks</th>
+                            <th>Rec Amt</th>
+                        </tr>`;
+
+                        rows.forEach((item, index) => {
+                            const formattedDate = new Date(item.date).toLocaleDateString("en-GB");
+                            const amount = parseFloat(item.amount_paid.replace(/,/g, ''));
+                            total += amount;
+
+                            tableBody.innerHTML += `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${formattedDate}</td>
+                                <td>${item.party_name}</td>
+                                <td>${item.area}</td>
+                                <td>${item.remarks}</td>
+                                <td>${item.amount_paid}</td>
+                            </tr>`;
+                        });
+
+                        totalRecoveryAll += total;
+                        totalCustomersAll += rows.length;
+
+                        tableBody.innerHTML += `
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">Total Recovery:</td>
+                            <td class="fw-bold">${total.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">Total Customers:</td>
+                            <td class="fw-bold">${rows.length}</td>
+                        </tr>
+                        <tr><td colspan="6" class="text-center text-muted">------------------------------------------</td></tr>`;
+                    }
+
+                    // 👉 FINAL SUMMARY FOOTER
                     tableBody.innerHTML += `
-                <tr>
-                    <td colspan="5" class="text-end fw-bold">Total Recovery:</td>
-                    <td class="fw-bold">${totalAmount.toLocaleString()}</td>
-                </tr>`;
-                    // Corrected: count all rows as customers if each row is a customer
-                    tableBody.innerHTML += `
-                <tr>
-                    <td colspan="5" class="text-end fw-bold">Total Customers:</td>
-                    <td class="fw-bold">${data.length}</td>
-                </tr>`;
-                } else {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No Data Available</td></tr>`;
+                    <tr>
+                        <td colspan="5" class="text-end fw-bold text-danger">Grand Total Recovery:</td>
+                        <td class="fw-bold text-danger">${totalRecoveryAll.toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" class="text-end fw-bold text-danger">Grand Total Customers:</td>
+                        <td class="fw-bold text-danger">${totalCustomersAll}</td>
+                    </tr>`;
                 }
             })
             .catch(error => console.error("Error:", error));

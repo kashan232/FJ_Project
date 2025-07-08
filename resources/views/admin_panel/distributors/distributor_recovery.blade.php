@@ -67,7 +67,17 @@
                                                                 <label class="form-label">Distributor</label>
                                                                 <input type="text" class="form-control" value="{{ $recovery->distributor->Customer ?? 'N/A' }}" readonly>
                                                             </div>
-
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Select Salesman</label>
+                                                                <select class="form-control" id="salesman" name="salesman" required>
+                                                                    <option value="" disabled>Select Salesman</option>
+                                                                    @foreach($Salesmans as $saleman)
+                                                                    <option value="{{ $saleman->name }}" {{ $recovery->salesman == $saleman->name ? 'selected' : '' }}>
+                                                                        {{ $saleman->name }}
+                                                                    </option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </div>
                                                             <div class="mb-3">
                                                                 <label class="form-label">Original Amount</label>
                                                                 <input type="text" class="form-control" id="modal_amount_paid_{{ $recovery->id }}" value="{{ $recovery->amount_paid }}" readonly>

@@ -36,7 +36,7 @@
         <div class="content">
             <div class="card p-4 shadow-lg">
                 <div class="card-body">
-                    <h3 class="text-center fw-bold text-primary">RECEIVABLE REPORT</h3>
+                    <h3 class="text-center fw-bold text-primary">MARKET CREDIT REPORT</h3>
 
                     <form id="ledgerSearchForm">
                         @csrf
@@ -44,7 +44,7 @@
                             <div class="col-md-3">
                                 <label class="form-label">Select City</label>
                                 <select class="form-control" name="city" id="citySelect">
-                                    <option value="">Select City</option>
+                                    <option value="All">All</option>
                                     @foreach($cities as $city)
                                     <option value="{{ $city->city_name }}">{{ $city->city_name }}</option>
                                     @endforeach
@@ -135,7 +135,7 @@
             let startDate = $('#start_date').val();
             let endDate = $('#end_date').val();
 
-            if (!city || area.length === 0 || !startDate || !endDate) {
+            if (!city || (!startDate || !endDate) || (city !== 'All' && area.length === 0)) {
                 alert('Please fill all fields!');
                 return;
             }

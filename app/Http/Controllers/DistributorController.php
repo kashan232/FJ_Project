@@ -199,7 +199,9 @@ class DistributorController extends Controller
         if (Auth::id()) {
             $userId = Auth::id();
             $Recoveries = Recovery::where('admin_or_user_id', $userId)->with('distributor')->get();
-            return view('admin_panel.distributors.distributor_recovery', compact('Recoveries'));
+            $distributors = Distributor::all(['id', 'Customer']); // using 'Customer' as distributor name
+            $Salesmans = Salesman::where('admin_or_user_id', $userId)->where('designation', 'Saleman')->get();
+            return view('admin_panel.distributors.distributor_recovery', compact('Recoveries','Salesmans','distributors'));
         } else {
             return redirect()->back();
         }
@@ -208,6 +210,7 @@ class DistributorController extends Controller
     public function updateDistributorRecovery(Request $request, $id)
     {
         $request->validate([
+            'salesman' => 'required',
             'date' => 'required|date',
             'adjust_type' => 'required|in:plus,minus',
             'adjust_amount' => 'required|numeric|min:0',
@@ -241,6 +244,7 @@ class DistributorController extends Controller
 
         $recovery->update([
             'amount_paid' => $new_amount_paid,
+            'salesman' => $request->salesman,
             'remarks' => $request->description,
             'date' => $request->date,
         ]);

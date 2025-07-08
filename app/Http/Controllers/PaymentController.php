@@ -201,7 +201,6 @@ class PaymentController extends Controller
         $latestLedger = DistributorLedger::where('distributor_id', $request->distributor_id)
             ->latest('id')
             ->first();
-
         if (!$latestLedger) {
             return redirect()->back()->with('error', 'Ledger record not found for this distributor.');
         }
@@ -217,7 +216,7 @@ class PaymentController extends Controller
         // Create recovery
         Recovery::create([
             'admin_or_user_id' => auth()->id(),
-            'distributor_ledger_id' => $latestLedger->id,
+            'distributor_ledger_id' => $latestLedger->distributor_id,
             'amount_paid' => $request->amount,
             'salesman' => $request->salesman,
             'date' => $request->date,
