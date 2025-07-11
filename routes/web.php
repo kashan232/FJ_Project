@@ -219,6 +219,8 @@ Route::post('/fetch-vendor-purchase-report', [ReportController::class, 'fetchVen
 Route::get('/Area-wise-Customer-payments', [ReportController::class, 'Area_wise_Customer_payments'])->name('Area-wise-Customer-payments');
 Route::get('/receivable-report', [ReportController::class, 'fetchReceivableReport'])->name('fetch.receivable.report');
 
+Route::get('/Date-wise-Sales-Report', [ReportController::class, 'Date_wise_Sales_Report'])->name('Date-wise-Sales-Report');
+Route::post('/get-sales-report', [ReportController::class, 'getsalesreport'])->name('get-sales-report');
 
 Route::get('/vendors-payments', [PaymentController::class, 'vendors_payments'])->name('vendors-payments');
 Route::post('/vendor-payment-store', [PaymentController::class, 'storeVendorPayment'])->name('vendor-payment-store');

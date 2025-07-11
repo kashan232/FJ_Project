@@ -641,9 +641,13 @@ class ReportController extends Controller
         $startDate = $request->start_date;
         $endDate = $request->end_date;
 
-        $allCities = $city === 'All'
-            ? DB::table('customers')->select('city')->distinct()->pluck('city')->toArray()
-            : [$city];
+        if ($city === 'All') {
+            $customerCities = DB::table('customers')->select('city')->distinct()->pluck('city')->toArray();
+            $distributorCities = DB::table('distributors')->select('City')->distinct()->pluck('City')->toArray();
+            $allCities = array_unique(array_merge($customerCities, $distributorCities));
+        } else {
+            $allCities = [$city];
+        }
 
         $result = [];
 
@@ -747,5 +751,90 @@ class ReportController extends Controller
         return response()->json([
             'data' => $result
         ]);
+    }
+
+    public function Date_wise_Sales_Report()
+    {
+        if (Auth::id()) {
+            $userId = Auth::id();
+            $Customers = Customer::where('admin_or_user_id', $userId)->get(); // Adjust according to your database structure
+
+            $Salesmans = Salesman::where('admin_or_user_id', $userId)
+                ->where('designation', 'Saleman')
+                ->get();
+
+            return view('admin_panel.reports.Date_wise_Sales_Report', [
+                'Customers' => $Customers,
+                'Salesmans' => $Salesmans,
+            ]);
+        } else {
+            return redirect()->back();
+        }
+    }
+    public function getsalesreport(Request $request)
+    {
+        $salesman = $request->salesman;
+        $type = $request->type;
+        $startDate = $request->start_date;
+        $endDate = $request->end_date;
+
+        $sales = [];
+
+        // --- Distributor Sales ---
+        if ($type == 'all' || $type == 'distributor') {
+            $query = DB::table('sales')->whereBetween('Date', [$startDate, $endDate]);
+
+            if ($salesman !== 'All') {
+                $query->where('Saleman', $salesman);
+            }
+
+            $results = $query->get();
+
+            // 👉 Get all distributor IDs from sales results
+            $distributorIds = $results->pluck('distributor_id')->unique()->filter()->values();
+
+            // 👉 Fetch all distributors in one query
+            $distributorMap = DB::table('distributors')
+                ->whereIn('id', $distributorIds)
+                ->pluck('Customer', 'id'); // id => Customer name
+
+            foreach ($results as $row) {
+                $distributorName = $distributorMap[$row->distributor_id] ?? 'Distributor-' . $row->distributor_id;
+
+                $sales[] = [
+                    'date' => $row->Date,
+                    'party_name' => $distributorName,
+                    'area' => $row->distributor_area ?? 'N/A',
+                    'remarks' => 'Distributor Sale',
+                    'amount_paid' => number_format($row->net_amount),
+                    'salesman' => $row->Saleman ?? '-'
+                ];
+            }
+        }
+
+
+        // --- Customer Sales (Local Sales) ---
+        if ($type == 'all' || $type == 'customer') {
+            $query = DB::table('local_sales')->whereBetween('Date', [$startDate, $endDate]);
+
+            if ($salesman !== 'All') {
+                $query->where('Saleman', $salesman);
+            }
+
+            $results = $query->get();
+
+            foreach ($results as $row) {
+                $sales[] = [
+                    'date' => $row->Date,
+                    'party_name' => $row->customer_shopname ?? 'Customer-' . $row->customer_id,
+                    'area' => $row->customer_area ?? 'N/A',
+                    'remarks' => 'Customer Sale',
+                    'amount_paid' => number_format($row->net_amount),
+                    'salesman' => $row->Saleman ?? '-'
+                ];
+            }
+        }
+
+        return response()->json($sales);
     }
 }
