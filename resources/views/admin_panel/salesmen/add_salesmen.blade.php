@@ -84,7 +84,6 @@
         </div>
     </div>
     <!-- Add Salesman Modal -->
-    <!-- Add Salesman Modal -->
     <div class="modal fade" id="addSalesmanModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg"> <!-- Increased modal size -->
             <div class="modal-content">
@@ -164,6 +163,21 @@
                                     <option value="0">Inactive</option>
                                 </select>
                             </div>
+                            <!-- These fields will be shown only when designation is "Saleman" -->
+                            <div class="row d-none" id="loginFields">
+                                <!-- Email -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" name="email" id="emailField">
+                                </div>
+
+                                <!-- Password -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" name="password" id="passwordField">
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
@@ -231,6 +245,33 @@
     </div>
 
     @include('admin_panel.include.footer_include')
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const designationSelect = document.getElementById("designationSelect");
+            const loginFields = document.getElementById("loginFields");
+            const emailField = document.getElementById("emailField");
+            const passwordField = document.getElementById("passwordField");
+
+            function toggleLoginFields() {
+                if (designationSelect.value === "Saleman") {
+                    loginFields.classList.remove("d-none");
+                    emailField.setAttribute("required", "required");
+                    passwordField.setAttribute("required", "required");
+                } else {
+                    loginFields.classList.add("d-none");
+                    emailField.removeAttribute("required");
+                    passwordField.removeAttribute("required");
+                    emailField.value = "";
+                    passwordField.value = "";
+                }
+            }
+
+            designationSelect.addEventListener("change", toggleLoginFields);
+
+            // Initial call in case default value is already selected
+            toggleLoginFields();
+        });
+    </script>
 
     <script>
         $(document).ready(function() {

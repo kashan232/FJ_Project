@@ -641,61 +641,111 @@ class ReportController extends Controller
         $startDate = $request->start_date;
         $endDate = $request->end_date;
 
-        // 🔁 Fetch customers based on city and area
-        $customersQuery = DB::table('customers');
+        $allCities = $city === 'All'
+            ? DB::table('customers')->select('city')->distinct()->pluck('city')->toArray()
+            : [$city];
 
-        if ($city !== 'All') {
-            $customersQuery->where('city', $city)->whereIn('area', $areas);
-        }
+        $result = [];
 
-        $customers = $customersQuery->get();
+        foreach ($allCities as $c) {
+            // ========== CUSTOMERS ==========
+            $customersQuery = DB::table('customers')->where('city', $c);
+            if ($city !== 'All') {
+                $customersQuery->whereIn('area', $areas);
+            }
 
-        $reportData = [];
+            $customers = $customersQuery->get();
 
-        foreach ($customers as $customer) {
-            // Step 1: Get opening balance
-            $ledger = DB::table('customer_ledgers')
-                ->where('customer_id', $customer->id)
-                ->select('opening_balance')
-                ->first();
+            $customerData = [];
+            foreach ($customers as $customer) {
+                $ledger = DB::table('customer_ledgers')
+                    ->where('customer_id', $customer->id)
+                    ->select('opening_balance')
+                    ->first();
+                $openingBalance = $ledger->opening_balance ?? 0;
 
-            $openingBalance = $ledger->opening_balance ?? 0;
+                $totalSales = DB::table('local_sales')
+                    ->where('customer_id', $customer->id)
+                    ->whereBetween('Date', [$startDate, $endDate])
+                    ->sum('grand_total');
 
-            // Step 2: Get total sales in selected date range
-            $totalSales = DB::table('local_sales')
-                ->where('customer_id', $customer->id)
-                ->whereBetween('Date', [$startDate, $endDate])
-                ->sum('grand_total');
+                $totalReturns = DB::table('sale_returns')
+                    ->where('sale_type', 'customer')
+                    ->where('party_id', $customer->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('total_return_amount');
 
-            // Step 3: Get sale returns in selected date range
-            $totalReturns = DB::table('sale_returns')
-                ->where('sale_type', 'customer')
-                ->where('party_id', $customer->id)
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->sum('total_return_amount');
+                $totalRecoveries = DB::table('customer_recoveries')
+                    ->where('customer_ledger_id', $customer->id)
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->sum('amount_paid');
 
-            // Step 4: Get recoveries in selected date range
-            $totalRecoveries = DB::table('customer_recoveries')
-                ->where('customer_ledger_id', $customer->id)
-                ->whereBetween('date', [$startDate, $endDate])
-                ->sum('amount_paid');
+                $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
 
-            // Step 5: Final balance
-            $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
+                $customerData[] = [
+                    'type' => 'customer',
+                    'pcode' => $customer->id,
+                    'name' => $customer->customer_name,
+                    'shopname' => $customer->shop_name,
+                    'address' => $customer->area,
+                    'contact' => $customer->phone_number,
+                    'balance' => round($balance, 2),
+                ];
+            }
 
-            $reportData[] = [
-                'pcode' => $customer->id,
-                'customer_name' => $customer->customer_name,
-                'address' => $customer->area,
-                'contact' => $customer->phone_number,
-                'balance' => round($balance, 2),
-                'cash_rec' => '', // You can fill this if needed
-                'remarks' => '',
+            // ========== DISTRIBUTORS ==========
+            $distributorQuery = DB::table('distributors')->where('City', $c);
+            if ($city !== 'All') {
+                $distributorQuery->whereIn('Area', $areas);
+            }
+
+            $distributors = $distributorQuery->get();
+
+            $distributorData = [];
+            foreach ($distributors as $distributor) {
+                $ledger = DB::table('distributor_ledgers')
+                    ->where('distributor_id', $distributor->id)
+                    ->select('opening_balance')
+                    ->first();
+                $openingBalance = $ledger->opening_balance ?? 0;
+
+                $totalSales = DB::table('sales')
+                    ->where('distributor_id', $distributor->id)
+                    ->whereBetween('Date', [$startDate, $endDate])
+                    ->sum('grand_total');
+
+                $totalReturns = DB::table('sale_returns')
+                    ->where('sale_type', 'distributor')
+                    ->where('party_id', $distributor->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('total_return_amount');
+
+                $totalRecoveries = DB::table('recoveries')
+                    ->where('distributor_ledger_id', $distributor->id)
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->sum('amount_paid');
+
+                $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
+
+                $distributorData[] = [
+                    'type' => 'distributor',
+                    'pcode' => $distributor->id,
+                    'name' => $distributor->Customer,
+                    'address' => $distributor->Area,
+                    'contact' => $distributor->Contact,
+                    'balance' => round($balance, 2),
+                ];
+            }
+
+            // Group per city
+            $result[$c] = [
+                'distributors' => $distributorData,
+                'customers' => $customerData
             ];
         }
 
         return response()->json([
-            'data' => $reportData
+            'data' => $result
         ]);
     }
 }

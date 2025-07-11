@@ -9,6 +9,7 @@ use App\Models\Designation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class SalesmanController extends Controller
 {
@@ -28,12 +29,13 @@ class SalesmanController extends Controller
         }
     }
 
-    // Store Salesman (already correctly handles adding new salesman)
     public function store_salesman(Request $request)
     {
         if (Auth::id()) {
             $userId = Auth::id();
-            Salesman::create([
+
+            // Step 1: Create salesman
+            $salesman = Salesman::create([
                 'admin_or_user_id' => $userId,
                 'name' => $request->name,
                 'phone' => $request->phone,
@@ -46,11 +48,26 @@ class SalesmanController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            // Step 2: If designation is 'Saleman', create user login as well
+            if (strtolower($request->designation) === 'saleman') {
+                \App\Models\User::create([
+                    'user_id' => $salesman->id,
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'password' => Hash::make($request->password),
+                    'usertype' => 'salesman',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
             return redirect()->back()->with('success', 'Salesman added successfully');
         } else {
-            return redirect()->back();
+            return redirect()->back()->with('error', 'Unauthorized');
         }
     }
+
 
     public function update_salesman(Request $request)
     {

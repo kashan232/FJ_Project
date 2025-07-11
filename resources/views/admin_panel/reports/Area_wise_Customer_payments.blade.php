@@ -151,61 +151,144 @@
                 },
                 success: function(response) {
                     $('#reportResults').html('');
+                    let grandTotal = 0;
 
-                    let groupedByArea = {};
-                    response.data.forEach(entry => {
-                        if (!groupedByArea[entry.address]) {
-                            groupedByArea[entry.address] = [];
+                    let totalDistributors = 0; // ✅ new
+                    let totalCustomers = 0; // ✅ new
+
+                    const dataByCity = response.data;
+
+                    Object.keys(dataByCity).forEach(city => {
+                        let cityDistributors = dataByCity[city].distributors;
+                        let cityCustomers = dataByCity[city].customers;
+
+                        let distributorTotal = 0;
+                        let customerTotal = 0;
+
+                        totalDistributors += cityDistributors.length; // ✅ accumulate
+                        totalCustomers += cityCustomers.length; // ✅ accumulate
+
+                        let cityHTML = `<div class="section-title text-primary fs-5">${city.toUpperCase()}</div>`;
+
+                        // ========== DISTRIBUTOR MARKET CREDIT ==========
+                        if (cityDistributors.length > 0) {
+                            cityHTML += `
+            <div class="section-title text-info">Distributor Market Credit</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>PCode</th>
+                        <th>Distributor Name</th>
+                        <th>Address</th>
+                        <th>Contact</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+                            cityDistributors.forEach(dis => {
+                                let bal = parseFloat(dis.balance);
+                                distributorTotal += bal;
+
+                                cityHTML += `
+                <tr>
+                    <td>${dis.pcode}</td>
+                    <td>${dis.name}</td>
+                    <td>${dis.address}</td>
+                    <td>${dis.contact}</td>
+                    <td>${bal.toLocaleString()}</td>
+                </tr>
+            `;
+                            });
+
+                            cityHTML += `
+                <tr class="summary-row">
+                    <td colspan="4" class="text-end">Total Distributor Credit</td>
+                    <td>${distributorTotal.toLocaleString()}</td>
+                </tr>
+                <tr class="summary-row">
+                    <td colspan="4" class="text-end">Total Distributors in ${city}:</td>
+                    <td>${cityDistributors.length}</td>
+                </tr>
+                </tbody>
+            </table>
+        `;
                         }
-                        groupedByArea[entry.address].push(entry);
+
+                        // ========== CUSTOMER MARKET CREDIT ==========
+                        if (cityCustomers.length > 0) {
+                            cityHTML += `
+            <div class="section-title text-success">Customer Market Credit</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>PCode</th>
+                        <th>ShopName</th>
+                        <th>Customer Name</th>
+                        <th>Address</th>
+                        <th>Contact</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+                            cityCustomers.forEach(cus => {
+                                let bal = parseFloat(cus.balance);
+                                customerTotal += bal;
+
+                                cityHTML += `
+                <tr>
+                    <td>${cus.pcode}</td>
+                    <td>${cus.shopname}</td>
+                    <td>${cus.name}</td>
+                    <td>${cus.address}</td>
+                    <td>${cus.contact}</td>
+                    <td>${bal.toLocaleString()}</td>
+                </tr>
+            `;
+                            });
+
+                            cityHTML += `
+                <tr class="summary-row">
+                    <td colspan="5" class="text-end">Total Customer Credit</td>
+                    <td>${customerTotal.toLocaleString()}</td>
+                </tr>
+                <tr class="summary-row">
+                    <td colspan="5" class="text-end">Total Customers in ${city}:</td>
+                    <td>${cityCustomers.length}</td>
+                </tr>
+                </tbody>
+            </table>
+        `;
+                        }
+
+                        const cityTotal = distributorTotal + customerTotal;
+                        grandTotal += cityTotal;
+
+                        cityHTML += `
+        <div class="text-end mt-2 fw-bold text-dark">
+            Total Credit (Distributor + Customer) in ${city}: ${cityTotal.toLocaleString()}
+        </div>
+        <hr>
+    `;
+
+                        $('#reportResults').append(cityHTML);
                     });
 
-                    for (let area in groupedByArea) {
-                        let customers = groupedByArea[area];
-                        let totalBalance = 0;
-                        let html = `
-                            <div class="section-title">${area.toUpperCase()}</div>
-                            <table class="report-table">
-                                <thead>
-                                    <tr>
-                                        <th>PCode</th>
-                                        <th>Customer Name</th>
-                                        <th>Address</th>
-                                        <th>Contact</th>
-                                        <th>Balance</th>
-                                        <th>Cash Rec</th>
-                                        <th>Remarks</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                        `;
-
-                        customers.forEach(c => {
-                            totalBalance += parseFloat(c.balance);
-                            html += `
-                                <tr>
-                                    <td>${c.pcode}</td>
-                                    <td>${c.customer_name}</td>
-                                    <td>${c.address}</td>
-                                    <td>${c.contact}</td>
-                                    <td>${parseFloat(c.balance).toLocaleString()}</td>
-                                    <td>${c.cash_rec ? parseFloat(c.cash_rec).toLocaleString() : ''}</td>
-                                    <td>${c.remarks ?? ''}</td>
-                                </tr>
-                            `;
-                        });
-
-                        html += `
-                            <tr class="summary-row">
-                                <td colspan="4">Total Count: ${customers.length}</td>
-                                <td>${totalBalance.toLocaleString()}</td>
-                                <td colspan="2"></td>
-                            </tr>
-                            </tbody></table>
-                        `;
-
-                        $('#reportResults').append(html);
-                    }
+                    // ==== GRAND TOTAL ====
+                    $('#reportResults').append(`
+        <div class="section-title text-dark text-end fs-5">
+            <strong>Total Distributors: </strong> ${totalDistributors.toLocaleString()}
+        </div>
+        <div class="section-title text-dark text-end fs-5">
+            <strong>Total Customers: </strong> ${totalCustomers.toLocaleString()}
+        </div>
+        <div class="section-title text-dark text-end fs-5">
+            <strong>Grand Credit Amount: </strong> ${grandTotal.toLocaleString()}
+        </div>
+    `);
                 },
                 error: function() {
                     alert('Failed to load data');
