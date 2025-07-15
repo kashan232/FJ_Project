@@ -61,7 +61,8 @@
                     <table id="recoveryTable">
                         <thead>
                             <tr>
-                                <th>#</th>
+                                <th>SN#</th>
+                                <th>Invoice#</th>
                                 <th>Date</th>
                                 <th>Party Name</th>
                                 <th>Area</th>
@@ -71,7 +72,7 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td colspan="6" class="text-center">No Data Available</td>
+                                <td colspan="7" class="text-center">No Data Available</td>
                             </tr>
                         </tbody>
                     </table>
@@ -171,15 +172,15 @@
 
                         tableBody.innerHTML += `
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Sales:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Sales:</td>
                             <td class="fw-bold">${totalAmount.toLocaleString()}</td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Customers:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Customers:</td>
                             <td class="fw-bold">${data.length}</td>
                         </tr>`;
                     } else {
-                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No Data Available</td></tr>`;
+                        tableBody.innerHTML = `<tr><td colspan="7" class="text-center">No Data Available</td></tr>`;
                     }
 
                 } else {
@@ -187,7 +188,7 @@
                     tableHead.style.display = "none";
 
                     if (data.length === 0) {
-                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No Data Available</td></tr>`;
+                        tableBody.innerHTML = `<tr><td colspan="7" class="text-center">No Data Available</td></tr>`;
                         return;
                     }
 
@@ -206,9 +207,10 @@
 
                         // Group heading
                         tableBody.innerHTML += `
-                        <tr><td colspan="6" class="fw-bold text-primary">Salesman: ${smName}</td></tr>
+                        <tr><td colspan="7" class="fw-bold text-primary">Salesman: ${smName}</td></tr>
                         <tr>
-                            <th>Voc #</th>
+                            <th>SN#</th>
+                            <th>Invoice#</th>
                             <th>Date</th>
                             <th>Party Name</th>
                             <th>Area</th>
@@ -224,6 +226,7 @@
                             tableBody.innerHTML += `
                             <tr>
                                 <td>${index + 1}</td>
+                                <td>${item.invoice_number}</td>
                                 <td>${formattedDate}</td>
                                 <td>${item.party_name}</td>
                                 <td>${item.area}</td>
@@ -237,24 +240,24 @@
 
                         tableBody.innerHTML += `
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Sales:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Sales:</td>
                             <td class="fw-bold">${total.toLocaleString()}</td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Customers:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Customers:</td>
                             <td class="fw-bold">${rows.length}</td>
                         </tr>
-                        <tr><td colspan="6" class="text-center text-muted">------------------------------------------</td></tr>`;
+                        <tr><td colspan="7" class="text-center text-muted">------------------------------------------</td></tr>`;
                     }
 
                     // 👉 FINAL SUMMARY FOOTER
                     tableBody.innerHTML += `
                     <tr>
-                        <td colspan="5" class="text-end fw-bold text-danger">Grand Total Sales:</td>
+                        <td colspan="6" class="text-end fw-bold text-danger">Grand Total Sales:</td>
                         <td class="fw-bold text-danger">${totalRecoveryAll.toLocaleString()}</td>
                     </tr>
                     <tr>
-                        <td colspan="5" class="text-end fw-bold text-danger">Grand Total Customers:</td>
+                        <td colspan="6" class="text-end fw-bold text-danger">Grand Total Customers:</td>
                         <td class="fw-bold text-danger">${totalCustomersAll}</td>
                     </tr>`;
                 }

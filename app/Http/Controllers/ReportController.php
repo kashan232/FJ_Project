@@ -802,6 +802,7 @@ class ReportController extends Controller
                 $distributorName = $distributorMap[$row->distributor_id] ?? 'Distributor-' . $row->distributor_id;
 
                 $sales[] = [
+                    'invoice_number' => $row->invoice_number,
                     'date' => $row->Date,
                     'party_name' => $distributorName,
                     'area' => $row->distributor_area ?? 'N/A',
@@ -825,6 +826,7 @@ class ReportController extends Controller
 
             foreach ($results as $row) {
                 $sales[] = [
+                    'invoice_number' => $row->invoice_number,
                     'date' => $row->Date,
                     'party_name' => $row->customer_shopname ?? 'Customer-' . $row->customer_id,
                     'area' => $row->customer_area ?? 'N/A',
