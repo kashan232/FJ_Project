@@ -73,30 +73,54 @@
                                 <td class="text-end" style="border: 1px solid #000;">{{ json_decode($sale->amount)[$index] ?? '' }}</td>
                             </tr>
                             @endforeach
+
+                            @php
+                            $closing = $distributorLedger->closing_balance ?? 0;
+                            $netAmount = $sale->net_amount ?? 0;
+                            $calculatedPrevious = $closing - $netAmount;
+                            @endphp
+
+                            @if($distributorLedger)
+                            <tr>
+                                <td colspan="5"></td>
+                                <td class="fw-bold text-danger" colspan="3" style="border: 2px solid #000;">Previous Balance:</td>
+                                <td class="fw-bold text-end text-danger" style="border: 2px solid #000;">
+                                    {{ number_format($calculatedPrevious, 2) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="5"></td>
+                                <td class="fw-bold text-danger" colspan="3" style="border: 2px solid #000;">Closing Balance:</td>
+                                <td class="fw-bold text-end text-danger" style="border: 2px solid #000;">
+                                    {{ number_format($closing, 2) }}
+                                </td>
+                            </tr>
+                            @endif
+
                         </tbody>
                         @php
-                            $cartonTotal = collect(json_decode($sale->carton_qty))->sum();
-                            $literTotal = collect(json_decode($sale->liter))->sum();
+                        $cartonTotal = collect(json_decode($sale->carton_qty))->sum();
+                        $literTotal = collect(json_decode($sale->liter))->sum();
                         @endphp
                         <tfoot class="table-light">
                             <tr>
                                 <td colspan="5"></td>
-                                <td class="fw-bold"  colspan="3" style="border: 2px solid #000;">Gross Amount:</td>
+                                <td class="fw-bold" colspan="3" style="border: 2px solid #000;">Gross Amount:</td>
                                 <td class="fw-bold text-end" style="border: 2px solid #000;">{{ $sale->grand_total }}</td>
                             </tr>
                             <tr>
                                 <td colspan="5"></td>
-                                <td class="fw-bold" colspan="3"  style="border: 2px solid #000;">Discount Amount:</td>
+                                <td class="fw-bold" colspan="3" style="border: 2px solid #000;">Discount Amount:</td>
                                 <td class="fw-bold text-end" style="border: 2px solid #000;">{{ $sale->discount_value }}</td>
                             </tr>
                             <tr>
                                 <td colspan="5"></td>
-                                <td class="fw-bold" colspan="3"  style="border: 2px solid #000;">Scheme Amount:</td>
+                                <td class="fw-bold" colspan="3" style="border: 2px solid #000;">Scheme Amount:</td>
                                 <td class="fw-bold text-end" style="border: 2px solid #000;">{{ $sale->scheme_value	 }}</td>
                             </tr>
                             <tr>
                                 <td colspan="5"></td>
-                                <td class="fw-bold" colspan="3"  style="border: 2px solid #000;">Net Amount:</td>
+                                <td class="fw-bold" colspan="3" style="border: 2px solid #000;">Net Amount:</td>
                                 <td class="fw-bold text-end" style="border: 2px solid #000;">{{ $sale->net_amount }}</td>
                             </tr>
                             <tr>
@@ -148,10 +172,11 @@
         padding-top: 12px;
         /* Tfoot aur tbody ke beech distance */
     }
-    p
-    {
+
+    p {
         font-size: 12px;
     }
+
     @media print {
         body * {
             visibility: hidden;

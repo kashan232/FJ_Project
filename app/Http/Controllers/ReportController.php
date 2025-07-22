@@ -625,6 +625,7 @@ class ReportController extends Controller
             $userId = Auth::id();
             $Customers = Customer::where('admin_or_user_id', $userId)->get(); // Adjust according to your database structure
             $cities = City::all(); // Updated the variable name to avoid confusion
+           
             return view('admin_panel.reports.Area_wise_Customer_payments', [
                 'Customers' => $Customers,
                 'cities' => $cities,
@@ -640,6 +641,7 @@ class ReportController extends Controller
         $areas = $request->area;
         $startDate = $request->start_date;
         $endDate = $request->end_date;
+        $salesman = $request->salesman; // new line
 
         if ($city === 'All') {
             $customerCities = DB::table('customers')->select('city')->distinct()->pluck('city')->toArray();

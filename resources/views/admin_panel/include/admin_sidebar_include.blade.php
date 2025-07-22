@@ -234,7 +234,42 @@
                 </li>
             </ul>
             @endif
+            @if(Auth::check() && Auth::user()->usertype == 'salesman')
+            <ul>
+                <li class="active">
+                    <a href="{{ route('home') }}"><i class="fas fa-home"></i><span> Dashboard</span> </a>
+                </li>
 
+                <li class="submenu">
+                    <a href="javascript:void(0);"><i class="fas fa-shopping-bag"></i><span>  Sale Invoice</span> <span class="menu-arrow"></span></a>
+                    <ul>
+                        <li><a href="{{ route('all-local-sale') }}">Sales</a></li>
+                    </ul>
+                </li>
+                <li class="submenu">
+                    <a href="javascript:void(0);"><i class="fas fa-address-book"></i><span>Customer Management</span> <span class="menu-arrow"></span></a>
+                    <ul>
+                        <li><a href="{{ route('customer-ledger') }}">Cutomers Payments </a></li>
+                        <li><a href="{{ route('customer-recovery') }}">Cutomers Recoveries </a></li>
+                    </ul>
+                </li>
+
+                <li class="submenu">
+                    <a href="javascript:void(0);"><i class="fas fa-address-book"></i><span>Payments Management</span> <span class="menu-arrow"></span></a>
+                    <ul>
+                        <li><a href="{{ route('customer-payments') }}">Customer Payments </a></li>
+                    </ul>
+                </li>
+
+                <li class="submenu">
+                    <a href="javascript:void(0);"><i class="fas fa-chart-pie"></i><span>Reporting</span> <span class="menu-arrow"></span></a>
+                    <ul>
+                        <li><a href="{{ route('date-wise-recovery-report') }}">Date Wise Recovery Report </a></li>
+                        <li><a href="{{ route('Area-wise-Customer-payments') }}">Area wise Customer Report </a></li>
+                    </ul>
+                </li>
+            </ul>
+            @endif
         </div>
     </div>
 </div>

@@ -76,10 +76,35 @@
                                 <td class="text-end" style="border: 1px solid #000;">{{ json_decode($sale->amount)[$index] ?? '' }}</td>
                             </tr>
                             @endforeach
+
+                            @php
+                            $closing = $customerLedger->closing_balance ?? 0;
+                            $netAmount = $sale->net_amount ?? 0;
+                            $calculatedPrevious = $closing - $netAmount;
+                            @endphp
+
+                            @if($customerLedger)
+                            <tr>
+                                <td colspan="5"></td>
+                                <td class="fw-bold text-danger" colspan="3" style="border: 2px solid #000;">Previous Balance:</td>
+                                <td class="fw-bold text-end text-danger" style="border: 2px solid #000;">
+                                    {{ number_format($calculatedPrevious, 2) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="5"></td>
+                                <td class="fw-bold text-danger" colspan="3" style="border: 2px solid #000;">Closing Balance:</td>
+                                <td class="fw-bold text-end text-danger" style="border: 2px solid #000;">
+                                    {{ number_format($closing, 2) }}
+                                </td>
+                            </tr>
+                            @endif
+
+
                         </tbody>
                         @php
-                            $cartonTotal = collect(json_decode($sale->carton_qty))->sum();
-                            $literTotal = collect(json_decode($sale->liter))->sum();
+                        $cartonTotal = collect(json_decode($sale->carton_qty))->sum();
+                        $literTotal = collect(json_decode($sale->liter))->sum();
                         @endphp
                         <tfoot class="table-light">
                             <tr>

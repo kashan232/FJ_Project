@@ -87,21 +87,41 @@ class PaymentController extends Controller
 
     public function customer_payments()
     {
-        if (Auth::id()) {
-            $userId = Auth::id();
-
-            $customers = Customer::where('admin_or_user_id', $userId)
-                ->get(['id', 'customer_name', 'shop_name', 'area']);
-
-            $Salesmans = Salesman::where('admin_or_user_id', $userId)
-                ->where('designation', 'Saleman')
-                ->get();
-
-            return view('admin_panel.payments.customers_payments', compact('customers', 'Salesmans'));
-        } else {
+        if (!Auth::check()) {
             return redirect()->back();
         }
+
+        $authUser = Auth::user();
+
+        // Step 1: Determine owner/admin/distributor ID
+        if ($authUser->usertype === 'salesman') {
+            $salesman = Salesman::where('name', $authUser->name)->first();
+
+            if (!$salesman) {
+                return redirect()->back()->with('error', 'Salesman not found.');
+            }
+
+            $ownerId = $salesman->admin_or_user_id;
+
+            // Only the logged-in salesman should be visible
+            $Salesmans = collect([$salesman]); // wrap in collection for compatibility in view
+        } else {
+            $ownerId = $authUser->id;
+
+            // All salesmen created by this owner
+            $Salesmans = Salesman::where('admin_or_user_id', $ownerId)
+                ->where('designation', 'Saleman')
+                ->get();
+        }
+
+        // Step 2: Fetch all customers under this owner
+        $customers = Customer::where('admin_or_user_id', $ownerId)
+            ->get(['id', 'customer_name', 'shop_name', 'area']);
+
+        return view('admin_panel.payments.customers_payments', compact('customers', 'Salesmans'));
     }
+
+
 
 
     public function getCustomerBalance($id)

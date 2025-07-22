@@ -33,10 +33,12 @@ class SalesmanController extends Controller
     {
         if (Auth::id()) {
             $userId = Auth::id();
-
-            // Step 1: Create salesman
+            $authUser = Auth::user(); // current logged in user
+            $creatorType = $authUser->usertype; // e.g. admin, distributor
+            // Step 1: Create salesman with identify info
             $salesman = Salesman::create([
                 'admin_or_user_id' => $userId,
+                'identify' => $creatorType,
                 'name' => $request->name,
                 'phone' => $request->phone,
                 'designation' => $request->designation,
@@ -57,6 +59,7 @@ class SalesmanController extends Controller
                     'email' => $request->email,
                     'password' => Hash::make($request->password),
                     'usertype' => 'salesman',
+                    'identify' => $creatorType, // also store who created this user
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -67,6 +70,7 @@ class SalesmanController extends Controller
             return redirect()->back()->with('error', 'Unauthorized');
         }
     }
+
 
 
     public function update_salesman(Request $request)

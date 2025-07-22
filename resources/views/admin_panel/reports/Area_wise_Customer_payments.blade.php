@@ -40,8 +40,8 @@
 
                     <form id="ledgerSearchForm">
                         @csrf
-                        <div class="row g-3">
-                            <div class="col-md-3">
+                        <div class="row g-3 mt-3">
+                            <div class="col-md-6">
                                 <label class="form-label">Select City</label>
                                 <select class="form-control" name="city" id="citySelect">
                                     <option value="All">All</option>
@@ -51,7 +51,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-9" id="areaCheckboxes">
+                            <div class="col-md-6" id="areaCheckboxes">
                                 <label class="form-label d-block">Select Areas</label>
                                 <div class="row" id="areasContainer">
                                     <!-- Dynamic Area Checkboxes -->

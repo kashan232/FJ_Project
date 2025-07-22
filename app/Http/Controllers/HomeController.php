@@ -18,14 +18,17 @@ class HomeController extends Controller
                 return view('distributor_panel.dashboard', [
                     'userId' => $userId,
                 ]);
-            } 
-             
-            else if($usertype=='admin')
+            }else if($usertype=='admin')
             {
                 return view('admin_panel.dashboard', [
                     'userId' => $userId,
                 ]);
-            }  
+            }else if($usertype=='salesman')
+            {
+                return view('salesman_panel.dashboard', [
+                    'userId' => $userId,
+                ]);
+            } 
 
             else
             {

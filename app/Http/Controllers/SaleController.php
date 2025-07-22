@@ -225,8 +225,20 @@ class SaleController extends Controller
     public function saleInvoice($id)
     {
         $sale = Sale::with('distributor')->findOrFail($id);
-        return view('admin_panel.sale.invoice', compact('sale'));
+
+        $distributorLedger = null;
+
+        // Agar is sale me distributor_id hai to ledger dhoondo
+        if ($sale->distributor_id) {
+            $distributorLedger = \App\Models\DistributorLedger::where('admin_or_user_id', $sale->admin_or_user_id)
+                ->where('distributor_id', $sale->distributor_id)
+                ->latest('id') // most recent entry
+                ->first();
+        }
+
+        return view('admin_panel.sale.invoice', compact('sale', 'distributorLedger'));
     }
+
 
 
     public function saleEdit($id)

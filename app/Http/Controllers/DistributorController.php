@@ -65,6 +65,7 @@ class DistributorController extends Controller
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'usertype' => 'distributor',
+                'identify' => 'distributor',
             ]);
 
             return redirect()->back()->with('success', 'Distributor added successfully');

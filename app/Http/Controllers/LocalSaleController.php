@@ -65,6 +65,7 @@ class LocalSaleController extends Controller
         // Sale Data Save
         $sale = LocalSale::create([
             'admin_or_user_id' => $userId,
+            'identify' => $user->identify,
             'invoice_number' => $invoiceNo,
             'Date' => $request->Date,
             'customer_id' => $request->customer_id,
@@ -155,20 +156,33 @@ class LocalSaleController extends Controller
         return redirect()->route('local.sale.invoice', $sale->id)->with('success', 'Sale recorded and stock updated!');
     }
 
-
-
-
-
     public function all_local_sale()
     {
-        if (Auth::id()) {
-            $userId = Auth::id();
-            $Sales = LocalSale::where('admin_or_user_id', $userId)->with('customer')->get();
-            return view('admin_panel.local_sale.all_sale', compact('Sales'));
-        } else {
+        if (!Auth::check()) {
             return redirect()->back();
         }
+
+        $authUser = Auth::user();
+        $userType = $authUser->usertype; // admin / distributor / salesman
+        $userIdentify = $authUser->identify; // 'admin' / 'distributor'
+        $userName = $authUser->name;
+
+        // Agar user salesman hai
+        if ($userType === 'salesman') {
+            $Sales = LocalSale::where('Saleman', $userName)
+                ->where('identify', $userIdentify) // 👈 yeh line add karo
+                ->with('customer')
+                ->get();
+        } else {
+            // admin ya distributor ka apna data
+            $Sales = LocalSale::where('admin_or_user_id', $authUser->id)
+                ->with('customer')
+                ->get();
+        }
+
+        return view('admin_panel.local_sale.all_sale', compact('Sales'));
     }
+
 
     public function show_local_sale($id)
     {
@@ -184,27 +198,67 @@ class LocalSaleController extends Controller
     public function localsaleInvoice($id)
     {
         $sale = LocalSale::with('customer')->findOrFail($id);
-        return view('admin_panel.local_sale.invoice', compact('sale'));
+
+        $customerId = $sale->customer_id;
+        $adminId = $sale->admin_or_user_id;
+
+        // Fetch latest ledger entry for this customer
+        $customerLedger = CustomerLedger::where('customer_id', $customerId)
+            ->where('admin_or_user_id', $adminId)
+            ->latest()
+            ->first();
+
+        return view('admin_panel.local_sale.invoice', compact('sale', 'customerLedger'));
     }
 
     public function delete_localsale($id)
     {
         $sale = LocalSale::findOrFail($id);
-
         $customerId = $sale->customer_id;
         $netAmount = $sale->net_amount;
 
-        // Delete the sale
-        $sale->delete();
+        // Step 1: Decode product-related arrays
+        $categories = json_decode($sale->category);
+        $subcategories = json_decode($sale->subcategory);
+        $codes = json_decode($sale->code);
+        $items = json_decode($sale->item);
+        $sizes = json_decode($sale->size);
+        $cartonQtys = json_decode($sale->carton_qty);
+        $pcs = json_decode($sale->pcs);
 
-        // Update distributor ledger
+        // Step 2: Loop through all products in the sale
+        for ($i = 0; $i < count($codes); $i++) {
+            $product = Product::where('item_code', $codes[$i])
+                ->where('item_name', $items[$i])
+                ->where('category', $categories[$i])
+                ->where('sub_category', $subcategories[$i])
+                ->where('size', $sizes[$i])
+                ->first();
+
+            if ($product) {
+                $cartonQty = (int) $cartonQtys[$i];
+                $pcsReturned = (int) $pcs[$i];
+                $pcsPerCarton = (int) $product->pcs_in_carton;
+
+                // Restore stock as it was reduced during sale
+                $product->carton_quantity += $cartonQty;
+                $product->initial_stock += ($cartonQty * $pcsPerCarton) + $pcsReturned;
+
+                $product->save();
+            }
+        }
+
+        // Step 3: Delete the sale
+        $sale->forceDelete();
+
+        // Step 4: Update customer ledger
         $ledger = CustomerLedger::where('customer_id', $customerId)->latest()->first();
         if ($ledger) {
             $ledger->closing_balance -= $netAmount;
             $ledger->save();
         }
 
-        return redirect()->back()->with('success', 'Local Sale deleted and Customer ledger updated.');
+        return redirect()->back()->with('success', 'Local Sale deleted, stock restored, and Customer ledger updated.');
     }
 
     public function localsaleEdit($id)

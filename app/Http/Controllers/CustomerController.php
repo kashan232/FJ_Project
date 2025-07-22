@@ -39,8 +39,11 @@ class CustomerController extends Controller
     {
         if (Auth::id()) {
             $userId = Auth::id();
+            $user = Auth::user();
+
             $customer = Customer::create([
                 'admin_or_user_id' => $userId,
+                'identify' => $user->identify,
                 'city' => $request->city,
                 'area' => $request->area,
                 'customer_name' => $request->customer_name,
@@ -71,15 +74,54 @@ class CustomerController extends Controller
 
     public function customer_ledger()
     {
-        if (Auth::id()) {
-            $userId = Auth::id();
-            $CustomerLedgers = CustomerLedger::where('admin_or_user_id', $userId)->with('Customer')->get();
-            $Salesmans = Salesman::where('admin_or_user_id', $userId)->where('designation', 'Saleman')->get();
-            return view('admin_panel.customer.customer_ledger', compact('CustomerLedgers', 'Salesmans'));
-        } else {
+        if (!Auth::check()) {
             return redirect()->back();
         }
+
+        $authUser = Auth::user();
+        $userType = $authUser->usertype; // admin / distributor / salesman
+        $userIdentify = $authUser->identify; // 'admin' / 'distributor'
+        $userName = $authUser->name;
+
+        if ($userType === 'salesman') {
+            // Salesman case: get owner/admin ID
+            $salesman = Salesman::where('name', $userName)->first();
+
+            if (!$salesman) {
+                return redirect()->back()->with('error', 'Salesman not found.');
+            }
+
+            $ownerId = $salesman->admin_or_user_id;
+
+            // Ledger data filtered by admin id and same identify
+            $CustomerLedgers = CustomerLedger::where('admin_or_user_id', $ownerId)
+                ->whereHas('Customer', function ($query) use ($userIdentify) {
+                    $query->where('identify', $userIdentify);
+                })
+                ->with('Customer')
+                ->get();
+
+            // Salesmen list for this owner
+            $Salesmans = Salesman::where('admin_or_user_id', $ownerId)
+                ->where('designation', 'Saleman')
+                ->get();
+        } else {
+            // Admin or distributor
+            $ownerId = $authUser->id;
+
+            $CustomerLedgers = CustomerLedger::where('admin_or_user_id', $ownerId)
+                ->with('Customer')
+                ->get();
+
+            $Salesmans = Salesman::where('admin_or_user_id', $ownerId)
+                ->where('designation', 'Saleman')
+                ->get();
+        }
+
+        return view('admin_panel.customer.customer_ledger', compact('CustomerLedgers', 'Salesmans'));
     }
+
+
 
     public function customer_recovery_store(Request $request)
     {
@@ -108,14 +150,42 @@ class CustomerController extends Controller
 
     public function customer_recovery()
     {
-        if (Auth::id()) {
-            $userId = Auth::id();
-            $Recoveries = CustomerRecovery::where('admin_or_user_id', $userId)->with('customer')->get();
-            return view('admin_panel.customer.customer_recovery', compact('Recoveries'));
-        } else {
+        if (!Auth::check()) {
             return redirect()->back();
         }
+
+        $authUser = Auth::user();
+        if ($authUser->usertype === 'salesman') {
+            // Match salesman via user_id instead of name
+            $salesman = Salesman::where('id', $authUser->user_id)->first();
+            if (!$salesman) {
+                return redirect()->back()->with('error', 'Salesman not found.');
+            }
+
+            $ownerId = $salesman->name;
+            // Fetch recoveries only by this salesman
+            $Recoveries = CustomerRecovery::where('salesman', $salesman->name)
+                ->with('customer')
+                ->get();
+
+            $Salesmans = collect([$salesman]);
+        } else {
+            $ownerId = $authUser->id;
+
+            $Recoveries = CustomerRecovery::where('admin_or_user_id', $ownerId)
+                ->with('customer')
+                ->get();
+
+            $Salesmans = Salesman::where('admin_or_user_id', $ownerId)
+                ->where('designation', 'Saleman')
+                ->get();
+        }
+
+        return view('admin_panel.customer.customer_recovery', compact('Recoveries', 'Salesmans'));
     }
+
+
+
 
     public function getCustomerData($id)
     {

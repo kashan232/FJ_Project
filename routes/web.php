@@ -3,6 +3,7 @@
 use App\Http\Controllers\Business_tpyeController;
 use App\Http\Controllers\CategoryAndSubCategoryController;
 use App\Http\Controllers\CityAndAreaController;
+use App\Http\Controllers\CreateBillController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DistributorController;
 use App\Http\Controllers\HomeController;
@@ -47,6 +48,9 @@ Route::get('/Area', [CityAndAreaController::class, 'Area'])->name('Area');
 Route::post('/store-Area', [CityAndAreaController::class, 'store_Area'])->name('store-Area');
 Route::post('/Area/update', [CityAndAreaController::class, 'update_area'])->name('Area.update');
 
+
+
+Route::get('/create-bill', [CreateBillController::class, 'create_bill'])->name('create-bill');
 
 
 Route::get('/Distributor', [DistributorController::class, 'Distributor'])->name('Distributor');
