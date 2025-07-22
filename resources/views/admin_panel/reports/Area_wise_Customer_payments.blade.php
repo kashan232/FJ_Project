@@ -42,6 +42,15 @@
                         @csrf
                         <div class="row g-3 mt-3">
                             <div class="col-md-6">
+                                <label for="salesman" class="form-label">Select Salesman</label>
+                                <select class="form-control" id="salesman" name="salesman" required>
+                                    <option value="All">All</option>
+                                    @foreach($Salesmans as $saleman)
+                                    <option value="{{ $saleman->name }}">{{ $saleman->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label">Select City</label>
                                 <select class="form-control" name="city" id="citySelect">
                                     <option value="All">All</option>
@@ -51,7 +60,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-6" id="areaCheckboxes">
+                            <div class="col-md-12" id="areaCheckboxes">
                                 <label class="form-label d-block">Select Areas</label>
                                 <div class="row" id="areasContainer">
                                     <!-- Dynamic Area Checkboxes -->
@@ -127,6 +136,7 @@
         });
 
         $('#searchLedger').click(function() {
+            let salesman = $('#salesman').val();
             let city = $('#citySelect').val();
             let area = [];
             $('.area-checkbox:checked').each(function() {
@@ -144,6 +154,7 @@
                 url: "{{ route('fetch.receivable.report') }}",
                 method: "GET",
                 data: {
+                    salesman: salesman,
                     city: city,
                     area: area,
                     start_date: startDate,
@@ -153,10 +164,23 @@
                     $('#reportResults').html('');
                     let grandTotal = 0;
 
-                    let totalDistributors = 0; // ✅ new
-                    let totalCustomers = 0; // ✅ new
+                    let totalDistributors = 0;
+                    let totalCustomers = 0;
 
                     const dataByCity = response.data;
+                    const salesmanName = response.salesman_name; // ✅ Get salesman name from response
+
+                    // Display Salesman Name at the top of the report
+                    if (salesmanName) {
+                        $('#reportResults').append(`
+                        <div class="report-header text-center mb-4">
+                            <h3 class="fw-bold">Market Credit Report for Salesman: <span class="text-primary">${salesmanName}</span></h3>
+                            <p>Date Range: ${startDate} to ${endDate}</p>
+                        </div>
+                        <hr>
+                    `);
+                    }
+
 
                     Object.keys(dataByCity).forEach(city => {
                         let cityDistributors = dataByCity[city].distributors;
@@ -165,8 +189,8 @@
                         let distributorTotal = 0;
                         let customerTotal = 0;
 
-                        totalDistributors += cityDistributors.length; // ✅ accumulate
-                        totalCustomers += cityCustomers.length; // ✅ accumulate
+                        totalDistributors += cityDistributors.length;
+                        totalCustomers += cityCustomers.length;
 
                         let cityHTML = `<div class="section-title text-primary fs-5">${city.toUpperCase()}</div>`;
 

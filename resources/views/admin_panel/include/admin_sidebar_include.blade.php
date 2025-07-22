@@ -130,6 +130,7 @@
                         <li><a href="{{ route('vendor-wise-purcahse-report') }}">Vendor wise Purchase Report </a></li>
                         <li><a href="{{ route('Area-wise-Customer-payments') }}">Area wise Customer Report </a></li>
                         <li><a href="{{ route('Date-wise-Sales-Report') }}">Date wise Sales Report </a></li>
+                        <!-- <li><a href="{{ route('Area-wise-salesman-market-payments') }}">Salesman Wise Market Credit Report</a></li> -->
 
                     </ul>
                 </li>

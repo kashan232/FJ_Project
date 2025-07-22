@@ -625,10 +625,15 @@ class ReportController extends Controller
             $userId = Auth::id();
             $Customers = Customer::where('admin_or_user_id', $userId)->get(); // Adjust according to your database structure
             $cities = City::all(); // Updated the variable name to avoid confusion
-           
+
+            $Salesmans = Salesman::where('admin_or_user_id', $userId)
+                ->where('designation', 'Saleman')
+                ->get();
+
             return view('admin_panel.reports.Area_wise_Customer_payments', [
                 'Customers' => $Customers,
                 'cities' => $cities,
+                'Salesmans' => $Salesmans,
             ]);
         } else {
             return redirect()->back();
@@ -641,7 +646,7 @@ class ReportController extends Controller
         $areas = $request->area;
         $startDate = $request->start_date;
         $endDate = $request->end_date;
-        $salesman = $request->salesman; // new line
+        $salesman = $request->salesman; // Salesman value fetched from request
 
         if ($city === 'All') {
             $customerCities = DB::table('customers')->select('city')->distinct()->pluck('city')->toArray();
@@ -656,14 +661,29 @@ class ReportController extends Controller
         foreach ($allCities as $c) {
             // ========== CUSTOMERS ==========
             $customersQuery = DB::table('customers')->where('city', $c);
-            if ($city !== 'All') {
+
+            // Filter by area if city is not 'All'
+            if ($city !== 'All' && is_array($areas) && !in_array('All', $areas)) {
                 $customersQuery->whereIn('area', $areas);
+            } elseif ($city !== 'All' && !is_array($areas) && $areas !== 'All') {
+                $customersQuery->where('area', $areas);
             }
 
             $customers = $customersQuery->get();
 
             $customerData = [];
             foreach ($customers as $customer) {
+                $customerHasSalesBySalesman = DB::table('local_sales')
+                    ->where('customer_id', $customer->id)
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->where('Saleman', $salesman);
+                    })
+                    ->exists();
+
+                if ($salesman !== 'All' && !$customerHasSalesBySalesman) {
+                    continue;
+                }
+
                 $ledger = DB::table('customer_ledgers')
                     ->where('customer_id', $customer->id)
                     ->select('opening_balance')
@@ -673,42 +693,82 @@ class ReportController extends Controller
                 $totalSales = DB::table('local_sales')
                     ->where('customer_id', $customer->id)
                     ->whereBetween('Date', [$startDate, $endDate])
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->where('Saleman', $salesman);
+                    })
                     ->sum('grand_total');
 
                 $totalReturns = DB::table('sale_returns')
                     ->where('sale_type', 'customer')
                     ->where('party_id', $customer->id)
                     ->whereBetween('created_at', [$startDate, $endDate])
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->whereExists(function ($subquery) use ($salesman) {
+                            $subquery->select(DB::raw(1))
+                                ->from('local_sales')
+                                ->whereColumn('local_sales.customer_id', 'sale_returns.party_id')
+                                ->where('local_sales.Saleman', $salesman);
+                        });
+                    })
                     ->sum('total_return_amount');
 
                 $totalRecoveries = DB::table('customer_recoveries')
                     ->where('customer_ledger_id', $customer->id)
                     ->whereBetween('date', [$startDate, $endDate])
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->where('salesman', $salesman);
+                    })
                     ->sum('amount_paid');
 
                 $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
 
-                $customerData[] = [
-                    'type' => 'customer',
-                    'pcode' => $customer->id,
-                    'name' => $customer->customer_name,
-                    'shopname' => $customer->shop_name,
-                    'address' => $customer->area,
-                    'contact' => $customer->phone_number,
-                    'balance' => round($balance, 2),
-                ];
+                if (round($balance, 2) != 0 || $totalSales > 0 || $totalReturns > 0 || $totalRecoveries > 0) {
+                    $customerData[] = [
+                        'type' => 'customer',
+                        'pcode' => $customer->id,
+                        'name' => $customer->customer_name,
+                        'shopname' => $customer->shop_name,
+                        'address' => $customer->area,
+                        'contact' => $customer->phone_number,
+                        'balance' => round($balance, 2),
+                    ];
+                }
             }
 
             // ========== DISTRIBUTORS ==========
             $distributorQuery = DB::table('distributors')->where('City', $c);
-            if ($city !== 'All') {
+
+            // Filter by area if city is not 'All'
+            if ($city !== 'All' && is_array($areas) && !in_array('All', $areas)) {
                 $distributorQuery->whereIn('Area', $areas);
+            } elseif ($city !== 'All' && !is_array($areas) && $areas !== 'All') {
+                $distributorQuery->where('Area', $areas);
+            }
+
+            if ($salesman !== 'All') {
+                $distributorQuery->whereExists(function ($query) use ($salesman) {
+                    $query->select(DB::raw(1))
+                        ->from('sales')
+                        ->whereColumn('sales.distributor_id', 'distributors.id')
+                        ->where('sales.Saleman', $salesman);
+                });
             }
 
             $distributors = $distributorQuery->get();
 
             $distributorData = [];
             foreach ($distributors as $distributor) {
+                $distributorHasSalesBySalesman = DB::table('sales')
+                    ->where('distributor_id', $distributor->id)
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->where('Saleman', $salesman);
+                    })
+                    ->exists();
+
+                if ($salesman !== 'All' && !$distributorHasSalesBySalesman) {
+                    continue;
+                }
+
                 $ledger = DB::table('distributor_ledgers')
                     ->where('distributor_id', $distributor->id)
                     ->select('opening_balance')
@@ -718,29 +778,45 @@ class ReportController extends Controller
                 $totalSales = DB::table('sales')
                     ->where('distributor_id', $distributor->id)
                     ->whereBetween('Date', [$startDate, $endDate])
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->where('Saleman', $salesman);
+                    })
                     ->sum('grand_total');
 
                 $totalReturns = DB::table('sale_returns')
                     ->where('sale_type', 'distributor')
                     ->where('party_id', $distributor->id)
                     ->whereBetween('created_at', [$startDate, $endDate])
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->whereExists(function ($subquery) use ($salesman) {
+                            $subquery->select(DB::raw(1))
+                                ->from('sales')
+                                ->whereColumn('sales.distributor_id', 'sale_returns.party_id')
+                                ->where('sales.Saleman', $salesman);
+                        });
+                    })
                     ->sum('total_return_amount');
 
                 $totalRecoveries = DB::table('recoveries')
                     ->where('distributor_ledger_id', $distributor->id)
                     ->whereBetween('date', [$startDate, $endDate])
+                    ->when($salesman !== 'All', function ($query) use ($salesman) {
+                        return $query->where('salesman', $salesman);
+                    })
                     ->sum('amount_paid');
 
                 $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
 
-                $distributorData[] = [
-                    'type' => 'distributor',
-                    'pcode' => $distributor->id,
-                    'name' => $distributor->Customer,
-                    'address' => $distributor->Area,
-                    'contact' => $distributor->Contact,
-                    'balance' => round($balance, 2),
-                ];
+                if (round($balance, 2) != 0 || $totalSales > 0 || $totalReturns > 0 || $totalRecoveries > 0) {
+                    $distributorData[] = [
+                        'type' => 'distributor',
+                        'pcode' => $distributor->id,
+                        'name' => $distributor->Customer,
+                        'address' => $distributor->Area,
+                        'contact' => $distributor->Contact,
+                        'balance' => round($balance, 2),
+                    ];
+                }
             }
 
             // Group per city
@@ -751,9 +827,118 @@ class ReportController extends Controller
         }
 
         return response()->json([
-            'data' => $result
+            'data' => $result,
+            'salesman_name' => ($salesman !== 'All') ? $salesman : 'All Salesmen' // Add salesman name to response
         ]);
     }
+
+
+    public function Area_wise_salesman_market_payments()
+    {
+        if (Auth::id()) {
+            $userId = Auth::id();
+            $Customers = Customer::where('admin_or_user_id', $userId)->get(); // Adjust according to your database structure
+            $cities = City::all(); // Updated the variable name to avoid confusion
+
+            $Salesmans = Salesman::where('admin_or_user_id', $userId)
+                ->where('designation', 'Saleman')
+                ->get();
+
+            return view('admin_panel.reports.Area_wise_salesman_market_payments', [
+                'Customers' => $Customers,
+                'cities' => $cities,
+                'Salesmans' => $Salesmans,
+            ]);
+        } else {
+            return redirect()->back();
+        }
+    }
+
+    public function receivablesalesmanmarketreport(Request $request)
+    {
+        $salesmanFilter = $request->input('salesman');
+        $city = $request->input('city');
+        $areas = $request->input('area');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $result = [];
+
+        // Get all salesmen or specific one
+        $salesmen = ($salesmanFilter === 'All')
+            ? Salesman::where('designation', 'Saleman')->pluck('name')
+            : collect([$salesmanFilter]);
+
+        foreach ($salesmen as $salesman) {
+            $salesmanData = [];
+
+            $customers = DB::table('customers')
+                ->join('local_sales', 'customers.id', '=', 'local_sales.customer_id')
+                ->where('local_sales.Saleman', $salesman)
+                ->where('customers.identify', 'admin') // Or your dynamic identity logic
+                ->when($city !== 'All', function ($q) use ($city) {
+                    $q->where('customers.city', $city);
+                })
+                ->when(!empty($areas) && $city !== 'All', function ($q) use ($areas) {
+                    $q->whereIn('customers.area', $areas);
+                })
+                ->select('customers.*')
+                ->distinct()
+                ->get();
+
+            foreach ($customers as $customer) {
+                // Get latest ledger
+                $ledger = DB::table('customer_ledgers')
+                    ->where('customer_id', $customer->id)
+                    ->latest('created_at')
+                    ->first();
+
+                $openingBalance = $ledger->opening_balance ?? 0;
+                $previousBalance = $ledger->previous_balance ?? 0;
+                $closingBalance = $ledger->closing_balance ?? 0;
+
+                $totalSales = DB::table('local_sales')
+                    ->where('customer_id', $customer->id)
+                    ->where('Saleman', $salesman)
+                    ->whereBetween('Date', [$startDate, $endDate])
+                    ->sum('grand_total');
+
+                $totalReturns = DB::table('sale_returns')
+                    ->where('sale_type', 'customer')
+                    ->where('party_id', $customer->id)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('total_return_amount');
+
+                $totalRecoveries = DB::table('customer_recoveries')
+                    ->where('salesman', $salesman)
+                    ->where('customer_ledger_id', $customer->id)
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->sum('amount_paid');
+
+                $balance = ($openingBalance + $totalSales - $totalReturns) - $totalRecoveries;
+
+                // Group by city > area
+                $salesmanData[$customer->city][$customer->area][] = [
+                    'customer_name' => $customer->customer_name,
+                    'shop_name' => $customer->shop_name,
+                    'phone' => $customer->phone_number,
+                    'opening_balance' => round($openingBalance, 2),
+                    'previous_balance' => round($previousBalance, 2),
+                    'closing_balance' => round($closingBalance, 2),
+                    'total_sales' => round($totalSales, 2),
+                    'total_returns' => round($totalReturns, 2),
+                    'total_recoveries' => round($totalRecoveries, 2),
+                    'balance' => round($balance, 2),
+                ];
+            }
+
+            $result[$salesman] = $salesmanData;
+        }
+
+        return response()->json($result);
+    }
+
+
 
     public function Date_wise_Sales_Report()
     {

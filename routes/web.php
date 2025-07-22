@@ -223,6 +223,10 @@ Route::post('/fetch-vendor-purchase-report', [ReportController::class, 'fetchVen
 Route::get('/Area-wise-Customer-payments', [ReportController::class, 'Area_wise_Customer_payments'])->name('Area-wise-Customer-payments');
 Route::get('/receivable-report', [ReportController::class, 'fetchReceivableReport'])->name('fetch.receivable.report');
 
+Route::get('/Area-wise-salesman-market-payments', [ReportController::class, 'Area_wise_salesman_market_payments'])->name('Area-wise-salesman-market-payments');
+Route::get('/receivable-salesman-marketreport', [ReportController::class, 'receivablesalesmanmarketreport'])->name('receivable.salesman.marketreport');
+
+
 Route::get('/Date-wise-Sales-Report', [ReportController::class, 'Date_wise_Sales_Report'])->name('Date-wise-Sales-Report');
 Route::post('/get-sales-report', [ReportController::class, 'getsalesreport'])->name('get-sales-report');
 
