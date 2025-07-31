@@ -52,24 +52,10 @@
                             <input type="text" id="detail" name="detail" class="form-control" placeholder="Enter additional payment details">
                         </div>
 
-                        <div class="text-end fw-bold text-secondary mb-3">
-                            Customer Balance: <span id="customer_balance" class="text-dark">PKR 0</span>
+                        <div class="text-end fw-bold text-danger mb-4 fs-5">
+                            Customer Balance: <span id="customer_balance">PKR 0</span>
                         </div>
 
-                        <div class="table-responsive mb-4">
-                            <label class="form-label text-dark d-block mb-2">Last 10 Sales</label>
-                            <table class="table table-bordered" id="sales_table">
-                                <thead class="table-success">
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Amount (PKR)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {{-- Populated by JS --}}
-                                </tbody>
-                            </table>
-                        </div>
 
                         <div class="d-flex justify-content-center gap-3">
                             <button type="submit" class="btn btn-success">Save & Close</button>
@@ -94,25 +80,8 @@
             .then(response => response.json())
             .then(data => {
                 document.getElementById('customer_balance').innerText = 'PKR ' + data.balance;
-
-                let tbody = document.querySelector('#sales_table tbody');
-                tbody.innerHTML = '';
-
-                if (data.sales && data.sales.length > 0) {
-                    data.sales.forEach(sale => {
-                        tbody.innerHTML += `
-                            <tr>
-                                <td>${sale.sale_date}</td>
-                                <td>${sale.total}</td>
-                            </tr>
-                        `;
-                    });
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="2">No Sales Found</td></tr>';
-                }
             });
     }
-
     $(document).ready(function() {
         $('#customer').on('change', function() {
             let customerId = $(this).val();

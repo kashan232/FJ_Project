@@ -237,12 +237,13 @@ Route::get('/get-vendor-balance/{id}', [PaymentController::class, 'getVendorBala
 Route::get('/customer-payments', [PaymentController::class, 'customer_payments'])->name('customer-payments');
 Route::get('/get-customer-balance/{id}', [PaymentController::class, 'getCustomerBalance'])->name('get.customer.balance');
 Route::post('/customer-payment/store', [PaymentController::class, 'storeCustomerPayment'])->name('customer.payment.store');
+Route::get('customer/payment/receipt/{customer_id}/{amount}', [PaymentController::class, 'showCustomerPaymentReceipt'])->name('Customer.payment.receipt');
 
 
 Route::get('/Distributor-payments', [PaymentController::class, 'Distributor_payments'])->name('Distributor-payments');
 Route::get('/get-Distributor-balance/{id}', [PaymentController::class, 'getDistributorBalance'])->name('get.Distributor.balance');
 Route::post('/Distributor-payment/store', [PaymentController::class, 'storeDistributorPayment'])->name('Distributor.payment.store');
-
+Route::get('/distributor/payment/receipt/{distributor_id}/{amount}', [PaymentController::class, 'showPaymentReceipt'])->name('Distributor.payment.receipt');
 
 Route::get('/', function () {
     return view('welcome');

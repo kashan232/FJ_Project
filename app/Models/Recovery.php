@@ -17,4 +17,10 @@ class Recovery extends Model
     {
         return $this->belongsTo(Distributor::class, 'distributor_ledger_id');
     }
+
+    public function ledger()
+    {
+        return $this->belongsTo(DistributorLedger::class, 'distributor_ledger_id');
+    }
+
 }

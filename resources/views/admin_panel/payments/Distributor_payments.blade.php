@@ -56,20 +56,6 @@
                             Customer Balance: <span id="customer_balance" class="text-dark">PKR 0</span>
                         </div>
 
-                        <div class="table-responsive mb-4">
-                            <label class="form-label text-dark d-block mb-2">Last 10 Sales</label>
-                            <table class="table table-bordered" id="sales_table">
-                                <thead class="table-success">
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Amount (PKR)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {{-- Populated by JS --}}
-                                </tbody>
-                            </table>
-                        </div>
 
                         <div class="d-flex justify-content-center gap-3">
                             <button type="submit" class="btn btn-success">Save & Close</button>
@@ -90,12 +76,10 @@
         url = url.replace(':id', distributorId);
 
         $.get(url, function(data) {
-            $('#customer_balance').text(`PKR ${data.balance}`);
-            let tableBody = $('#sales_table tbody');
-            tableBody.empty();
-            data.sales.forEach(sale => {
-                tableBody.append(`<tr><td>${sale.sale_date}</td><td>${sale.total}</td></tr>`);
-            });
+            $('#customer_balance').html(`<span style="color:red; font-size: 20px; font-weight: bold;">PKR ${data.balance}</span>`);
+
+            // Hide or clear the sales table
+            $('#sales_table tbody').empty();
         });
     });
 </script>

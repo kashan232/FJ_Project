@@ -126,12 +126,10 @@ class PaymentController extends Controller
 
     public function getCustomerBalance($id)
     {
-        $customer = Customer::with(['localSales' => function ($q) {
-            $q->select('id', 'customer_id', 'Date as sale_date', 'grand_total as total')->latest()->take(10);
-        }])->find($id);
+        $customer = Customer::find($id); // No need to eager load sales anymore
 
         if (!$customer) {
-            return response()->json(['balance' => 0, 'sales' => []]);
+            return response()->json(['balance' => 0]);
         }
 
         $latestLedger = CustomerLedger::where('customer_id', $id)
@@ -141,16 +139,13 @@ class PaymentController extends Controller
         $closingBalance = $latestLedger ? $latestLedger->closing_balance : 0;
 
         return response()->json([
-            'balance' => $closingBalance,
-            'sales' => $customer->localSales ?? []
+            'balance' => $closingBalance
         ]);
     }
 
 
     public function storeCustomerPayment(Request $request)
     {
-        // Validate request if needed here
-
         $latestLedger = CustomerLedger::where('customer_id', $request->customer_id)
             ->latest('id')
             ->first();
@@ -162,24 +157,53 @@ class PaymentController extends Controller
         $previous_balance = $latestLedger->closing_balance;
         $new_closing_balance = $previous_balance - $request->amount;
 
-        // Update ledger closing balance
+        // Update ledger
         $latestLedger->update([
             'closing_balance' => $new_closing_balance,
         ]);
 
-        // Create new recovery record
-        CustomerRecovery::create([
+        // Create recovery
+        $recovery = CustomerRecovery::create([
             'admin_or_user_id' => auth()->id(),
-            'customer_ledger_id' => $latestLedger->id,  // Important: Link to ledger record ID
+            'customer_ledger_id' => $latestLedger->customer_id, // Same as distributor logic
             'amount_paid' => $request->amount,
-            'salesman' => $request->salesman, // add if applicable
+            'salesman' => $request->salesman,
             'date' => $request->date,
-            'remarks' => $request->detail, // Use remarks or bank input
+            'remarks' => $request->detail,
         ]);
 
-        return redirect()->back()->with('success', 'Payment recorded successfully.');
+        return redirect()->route('Customer.payment.receipt', [
+            'customer_id' => $request->customer_id,
+            'amount' => $request->amount,
+            'date' => $request->date
+        ]);
     }
 
+    public function showCustomerPaymentReceipt($customer_id, $amount, Request $request)
+    {
+        $customer = Customer::findOrFail($customer_id);
+
+        $latestLedger = CustomerLedger::where('customer_id', $customer_id)
+            ->latest('id')
+            ->first();
+
+        $closing_balance = $latestLedger ? $latestLedger->closing_balance : 0;
+
+        $amount_paid = $amount; // Just renaming for clarity
+        $remarks = 'Cash Received'; // Optional, or fetch from DB if dynamic
+        $date = $request->date;
+        return view('admin_panel.payments.customer_payment_receipt', [
+            'customer' => $customer,
+            'amount' => $amount,
+            'amount_paid' => $amount_paid,
+            'closing_balance' => $closing_balance,
+            'date' => $date,
+            'remarks' => $remarks
+        ]);
+    }
+
+
+    
 
     public function Distributor_payments()
     {
@@ -195,12 +219,10 @@ class PaymentController extends Controller
 
     public function getDistributorBalance($id)
     {
-        $distributor = Distributor::with(['sales' => function ($q) {
-            $q->select('id', 'distributor_id', 'Date as sale_date', 'grand_total as total')->latest()->take(10);
-        }])->find($id);
+        $distributor = Distributor::find($id);
 
         if (!$distributor) {
-            return response()->json(['balance' => 0, 'sales' => []]);
+            return response()->json(['balance' => 0]);
         }
 
         $latestLedger = DistributorLedger::where('distributor_id', $id)
@@ -210,10 +232,10 @@ class PaymentController extends Controller
         $closingBalance = $latestLedger ? $latestLedger->closing_balance : 0;
 
         return response()->json([
-            'balance' => $closingBalance,
-            'sales' => $distributor->sales ?? []
+            'balance' => $closingBalance
         ]);
     }
+
 
 
     public function storeDistributorPayment(Request $request)
@@ -221,6 +243,7 @@ class PaymentController extends Controller
         $latestLedger = DistributorLedger::where('distributor_id', $request->distributor_id)
             ->latest('id')
             ->first();
+
         if (!$latestLedger) {
             return redirect()->back()->with('error', 'Ledger record not found for this distributor.');
         }
@@ -234,7 +257,7 @@ class PaymentController extends Controller
         ]);
 
         // Create recovery
-        Recovery::create([
+        $recovery = Recovery::create([
             'admin_or_user_id' => auth()->id(),
             'distributor_ledger_id' => $latestLedger->distributor_id,
             'amount_paid' => $request->amount,
@@ -243,6 +266,32 @@ class PaymentController extends Controller
             'remarks' => $request->detail,
         ]);
 
-        return redirect()->back()->with('success', 'Distributor payment recorded successfully.');
+        return redirect()->route('Distributor.payment.receipt', [
+            'distributor_id' => $request->distributor_id,
+            'amount' => $request->amount,
+            'date' => $request->date
+        ]);
+    }
+
+    public function showPaymentReceipt(Request $request)
+    {
+        $distributor_id = $request->distributor_id;
+        $amount = $request->amount;
+        $date = $request->date;
+
+        $distributor = Distributor::findOrFail($distributor_id);
+
+        $latestLedger = DistributorLedger::where('distributor_id', $distributor_id)
+            ->latest('id')
+            ->first();
+
+        $closing_balance = $latestLedger ? $latestLedger->closing_balance : 0;
+
+        return view('admin_panel.payments.distributor_payment_receipt', [
+            'distributor' => $distributor,
+            'amount' => $amount,
+            'date' => $date,distributor_payment_receipt
+            'closing_balance' => $closing_balance
+        ]);
     }
 }
