@@ -284,11 +284,14 @@
 
 
                     // ✅ Update Totals
+                    // ✅ Update Totals
                     $('#ledgerData').html(ledgerHTML);
                     $('#openingBalance').text(`Rs. ${openingBalance.toFixed(2)}`);
                     $('#totalDebit').text(`Rs. ${totalDebit.toFixed(2)}`);
                     $('#totalCredit').text(`Rs. ${totalCredit.toFixed(2)}`);
-                    $('#closingBalance').text(`Rs. ${balance.toFixed(2)}`);
+
+                    // Closing balance directly from API response
+                    $('#closingBalance').text(`Rs. ${parseFloat(response.closing_balance).toFixed(2)}`);
                 }
             });
         });

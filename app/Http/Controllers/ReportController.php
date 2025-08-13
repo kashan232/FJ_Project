@@ -101,24 +101,24 @@ class ReportController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        // Ledger record including balances
+        // ✅ Always get the vendor's stored ledger balances (no date filter)
         $ledger = DB::table('vendor_ledgers')
             ->where('vendor_id', $vendorId)
-            ->select('opening_balance', 'previous_balance', 'closing_balance')
+            ->orderBy('id', 'desc') // latest entry
             ->first();
 
         $opening_balance = $ledger->opening_balance ?? 0;
         $previous_balance = $ledger->previous_balance ?? 0;
         $closing_balance = $ledger->closing_balance ?? 0;
 
-        // Filter Recoveries in Date Range
+        // ✅ Filter Recoveries in selected Date Range
         $recoveries = DB::table('vendor_payments')
             ->where('vendor_id', $vendorId)
-            ->whereBetween('payment_date', [$startDate, $endDate]) // ✅ Date Range Apply
+            ->whereBetween('payment_date', [$startDate, $endDate])
             ->select('id', 'amount_paid', 'description', 'payment_date')
             ->get();
 
-        // ✅ Fetch Purchases
+        // ✅ Purchases
         $purchases = DB::table('purchases')
             ->where('party_name', $vendorId)
             ->whereBetween('purchase_date', [$startDate, $endDate])
@@ -129,12 +129,11 @@ class ReportController extends Controller
                     'invoice_number' => $purchase->invoice_number,
                     'date' => $purchase->purchase_date,
                     'grand_total' => $purchase->grand_total,
-                    'net_amount' => $purchase->grand_total, // assuming no discounts/scheme
-                    'salesman' => null, // optional
+                    'net_amount' => $purchase->grand_total,
                 ];
             });
 
-        // ✅ Fetch Returns
+        // ✅ Returns
         $returnsRaw = DB::table('purchase_returns')
             ->where('party_name', $vendorId)
             ->whereBetween('return_date', [$startDate, $endDate])
@@ -153,20 +152,22 @@ class ReportController extends Controller
                 'net_amount' => $amountSum,
             ];
         }
-        // ✅ Vendor Builty
+
+        // ✅ Builty
         $builties = DB::table('vendor_builties')
             ->where('vendor_id', $vendorId)
             ->whereBetween('date', [$startDate, $endDate])
             ->select('id', 'date', 'amount', 'description')
             ->get();
+
         return response()->json([
             'opening_balance' => $opening_balance,
             'previous_balance' => $previous_balance,
-            'closing_balance' => $closing_balance,
+            'closing_balance' => $closing_balance, // ✅ always matches vendor_ledgers table
             'purchases' => $purchases,
             'recoveries' => $recoveries,
             'returns' => $returns,
-            'builties' => $builties, // ✅ included here
+            'builties' => $builties,
             'startDate' => $startDate,
             'endDate' => $endDate,
         ]);
