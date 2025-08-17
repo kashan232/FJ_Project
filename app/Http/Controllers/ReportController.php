@@ -37,31 +37,50 @@ class ReportController extends Controller
     {
         $distributorId = $request->input('distributor_id');
 
-        // Ensure full datetime range
         $startDate = $request->input('start_date') . ' 00:00:00';
-        $endDate = $request->input('end_date') . ' 23:59:59';
+        $endDate   = $request->input('end_date') . ' 23:59:59';
 
-        // Get distributor ledger record
+        // ---- Get Ledger Base Opening ----
         $ledger = DB::table('distributor_ledgers')
             ->where('distributor_id', $distributorId)
-            ->select('opening_balance', 'previous_balance', 'closing_balance')
+            ->select('opening_balance')
             ->first();
 
-        // Filter Recoveries in Date Range
+        $baseOpening = $ledger->opening_balance ?? 0;
+
+        // ---- Transactions Before Start Date ----
+        $previousSales = DB::table('sales')
+            ->where('distributor_id', $distributorId)
+            ->where('Date', '<', $startDate)
+            ->sum('net_amount');
+
+        $previousRecoveries = DB::table('recoveries')
+            ->where('distributor_ledger_id', $distributorId)
+            ->where('date', '<', $startDate)
+            ->sum('amount_paid');
+
+        $previousReturns = DB::table('sale_returns')
+            ->where('sale_type', 'distributor')
+            ->where('party_id', $distributorId)
+            ->where('created_at', '<', $startDate)
+            ->sum('total_return_amount');
+
+        // ✅ Opening Balance = BaseOpening + (Sales − Recoveries − Returns)
+        $openingBalance = $baseOpening + $previousSales - ($previousRecoveries + $previousReturns);
+
+        // ---- Current Period Transactions ----
         $recoveries = DB::table('recoveries')
             ->where('distributor_ledger_id', $distributorId)
             ->whereBetween('date', [$startDate, $endDate])
             ->select('id', 'amount_paid', 'salesman', 'date', 'remarks')
             ->get();
 
-        // Filter Sales in Date Range
         $sales = DB::table('sales')
             ->where('distributor_id', $distributorId)
             ->whereBetween('Date', [$startDate, $endDate])
             ->select('invoice_number', 'Date', 'Booker', 'Saleman', 'grand_total', 'discount_value', 'scheme_value', 'net_amount')
             ->get();
 
-        // ✅ Correct DateTime format for Sale Returns
         $saleReturns = DB::table('sale_returns')
             ->where('sale_type', 'distributor')
             ->where('party_id', $distributorId)
@@ -69,15 +88,19 @@ class ReportController extends Controller
             ->select('invoice_number', 'created_at', 'total_return_amount')
             ->get();
 
+        // ✅ Closing Balance = Opening + Sales − (Recoveries + Returns)
+        $closingBalance = $openingBalance
+            + $sales->sum('net_amount')
+            - ($recoveries->sum('amount_paid') + $saleReturns->sum('total_return_amount'));
+
         return response()->json([
-            'opening_balance' => $ledger->opening_balance ?? 0,
-            'previous_balance' => $ledger->previous_balance ?? 0,
-            'closing_balance' => $ledger->closing_balance ?? 0,
-            'recoveries' => $recoveries,
-            'sales' => $sales,
-            'sale_returns' => $saleReturns,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
+            'opening_balance' => $openingBalance,
+            'closing_balance' => $closingBalance,
+            'recoveries'      => $recoveries,
+            'sales'           => $sales,
+            'sale_returns'    => $saleReturns,
+            'startDate'       => $startDate,
+            'endDate'         => $endDate,
         ]);
     }
 
@@ -95,30 +118,57 @@ class ReportController extends Controller
         }
     }
 
-    public function fetchvendorLedger(Request $request)
+    public function fetchVendorLedger(Request $request)
     {
-        $vendorId = $request->input('Vendor_id');
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
+        $vendorId  = $request->input('Vendor_id');
+        $startDate = $request->input('start_date') . ' 00:00:00';
+        $endDate   = $request->input('end_date') . ' 23:59:59';
 
-        // ✅ Always get the vendor's stored ledger balances (no date filter)
+        // ---- Get Base Opening from Vendor Ledger ----
         $ledger = DB::table('vendor_ledgers')
             ->where('vendor_id', $vendorId)
-            ->orderBy('id', 'desc') // latest entry
+            ->select('opening_balance')
             ->first();
 
-        $opening_balance = $ledger->opening_balance ?? 0;
-        $previous_balance = $ledger->previous_balance ?? 0;
-        $closing_balance = $ledger->closing_balance ?? 0;
+        $baseOpening = $ledger->opening_balance ?? 0;
 
-        // ✅ Filter Recoveries in selected Date Range
+        // ---- Transactions Before Start Date ----
+        $previousPurchases = DB::table('purchases')
+            ->where('party_name', $vendorId)
+            ->where('purchase_date', '<', $startDate)
+            ->sum('grand_total');
+
+        $previousPayments = DB::table('vendor_payments')
+            ->where('vendor_id', $vendorId)
+            ->where('payment_date', '<', $startDate)
+            ->sum('amount_paid');
+
+        $previousReturnsRaw = DB::table('purchase_returns')
+            ->where('party_name', $vendorId)
+            ->where('return_date', '<', $startDate)
+            ->get();
+
+        $previousReturns = 0;
+        foreach ($previousReturnsRaw as $return) {
+            $amountArray = json_decode($return->return_amount, true);
+            $previousReturns += collect($amountArray)->sum();
+        }
+
+        $previousBuilties = DB::table('vendor_builties')
+            ->where('vendor_id', $vendorId)
+            ->where('date', '<', $startDate)
+            ->sum('amount');
+
+        // ✅ Opening Balance = BaseOpening + Purchases + Builties − (Payments + Returns)
+        $openingBalance = $baseOpening + ($previousPurchases + $previousBuilties) - ($previousPayments + $previousReturns);
+
+        // ---- Current Period Transactions ----
         $recoveries = DB::table('vendor_payments')
             ->where('vendor_id', $vendorId)
             ->whereBetween('payment_date', [$startDate, $endDate])
             ->select('id', 'amount_paid', 'description', 'payment_date')
             ->get();
 
-        // ✅ Purchases
         $purchases = DB::table('purchases')
             ->where('party_name', $vendorId)
             ->whereBetween('purchase_date', [$startDate, $endDate])
@@ -127,51 +177,56 @@ class ReportController extends Controller
             ->map(function ($purchase) {
                 return [
                     'invoice_number' => $purchase->invoice_number,
-                    'date' => $purchase->purchase_date,
-                    'grand_total' => $purchase->grand_total,
-                    'net_amount' => $purchase->grand_total,
+                    'date'          => $purchase->purchase_date,
+                    'grand_total'   => $purchase->grand_total,
+                    'net_amount'    => $purchase->grand_total,
                 ];
             });
 
-        // ✅ Returns
         $returnsRaw = DB::table('purchase_returns')
             ->where('party_name', $vendorId)
             ->whereBetween('return_date', [$startDate, $endDate])
-            ->select('id', 'invoice_number', 'purchase_id', 'return_date', 'return_amount')
             ->get();
 
         $returns = [];
+        $currentReturns = 0;
         foreach ($returnsRaw as $return) {
             $amountArray = json_decode($return->return_amount, true);
-            $amountSum = collect($amountArray)->sum();
+            $amountSum   = collect($amountArray)->sum();
+            $currentReturns += $amountSum;
 
             $returns[] = [
-                'id' => $return->id,
+                'id'            => $return->id,
                 'invoice_number' => $return->invoice_number,
-                'date' => $return->return_date,
-                'net_amount' => $amountSum,
+                'date'          => $return->return_date,
+                'net_amount'    => $amountSum,
             ];
         }
 
-        // ✅ Builty
         $builties = DB::table('vendor_builties')
             ->where('vendor_id', $vendorId)
             ->whereBetween('date', [$startDate, $endDate])
             ->select('id', 'date', 'amount', 'description')
             ->get();
 
+        // ✅ Closing Balance = Opening + Purchases + Builties − (Payments + Returns)
+        $closingBalance = $openingBalance
+            + $purchases->sum('grand_total')
+            + $builties->sum('amount')
+            - ($recoveries->sum('amount_paid') + $currentReturns);
+
         return response()->json([
-            'opening_balance' => $opening_balance,
-            'previous_balance' => $previous_balance,
-            'closing_balance' => $closing_balance, // ✅ always matches vendor_ledgers table
-            'purchases' => $purchases,
-            'recoveries' => $recoveries,
-            'returns' => $returns,
-            'builties' => $builties,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
+            'opening_balance'  => $openingBalance,
+            'closing_balance'  => $closingBalance,
+            'purchases'        => $purchases,
+            'recoveries'       => $recoveries,
+            'returns'          => $returns,
+            'builties'         => $builties,
+            'startDate'        => $startDate,
+            'endDate'          => $endDate,
         ]);
     }
+
 
 
 
@@ -189,42 +244,52 @@ class ReportController extends Controller
     }
 
 
-    public function fetchCustomerledger(Request $request)
+    public function fetchCustomerLedger(Request $request)
     {
         $CustomerId = $request->input('Customer_id');
-        $startDate = $request->input('start_date'); // User selected Start Date
-        $endDate = $request->input('end_date');
+        $startDate  = $request->input('start_date') . ' 00:00:00';
+        $endDate    = $request->input('end_date') . ' 23:59:59';
 
-        // Get ledger record
+        // ---- Ledger Opening Balance from DB (first time user set) ----
         $ledger = DB::table('customer_ledgers')
             ->where('customer_id', $CustomerId)
-            ->select('opening_balance', 'previous_balance', 'closing_balance')
+            ->select('opening_balance')
             ->first();
 
-        // Get recoveries
+        $baseOpening = $ledger->opening_balance ?? 0;
+
+        // ---- Transactions Before Start Date ----
+        $previousSales = DB::table('local_sales')
+            ->where('customer_id', $CustomerId)
+            ->where('Date', '<', $startDate)
+            ->sum('net_amount');
+
+        $previousRecoveries = DB::table('customer_recoveries')
+            ->where('customer_ledger_id', $CustomerId)
+            ->where('date', '<', $startDate)
+            ->sum('amount_paid');
+
+        $previousReturns = DB::table('sale_returns')
+            ->where('sale_type', 'customer')
+            ->where('party_id', $CustomerId)
+            ->where('created_at', '<', $startDate)
+            ->sum('total_return_amount');
+
+        // ✅ Opening Balance = Ledger Opening + (Sales − Recoveries − Returns)
+        $openingBalance = $baseOpening + $previousSales - ($previousRecoveries + $previousReturns);
+
+        // ---- Current Period Transactions ----
         $recoveries = DB::table('customer_recoveries')
             ->where('customer_ledger_id', $CustomerId)
             ->whereBetween('date', [$startDate, $endDate])
             ->select('id', 'amount_paid', 'salesman', 'date', 'remarks')
             ->get();
 
-
-        // Get Local Sales
         $localSales = DB::table('local_sales')
             ->where('customer_id', $CustomerId)
             ->whereBetween('Date', [$startDate, $endDate])
-            ->select(
-                'invoice_number',
-                'Date',
-                'customer_shopname',
-                'grand_total',
-                'discount_value',
-                'scheme_value',
-                'net_amount',
-                'Saleman'
-            )
+            ->select('invoice_number', 'Date', 'customer_shopname', 'grand_total', 'discount_value', 'scheme_value', 'net_amount', 'Saleman')
             ->get();
-
 
         $saleReturns = DB::table('sale_returns')
             ->where('sale_type', 'customer')
@@ -233,17 +298,24 @@ class ReportController extends Controller
             ->select('invoice_number', 'total_return_amount', 'created_at')
             ->get();
 
+        // ✅ Closing Balance = Opening + Sales − (Recoveries + Returns)
+        $closingBalance = $openingBalance
+            + $localSales->sum('net_amount')
+            - ($recoveries->sum('amount_paid') + $saleReturns->sum('total_return_amount'));
+
         return response()->json([
-            'opening_balance' => $ledger->opening_balance ?? 0,
-            'previous_balance' => $ledger->previous_balance ?? 0,
-            'closing_balance' => $ledger->closing_balance ?? 0,
-            'recoveries' => $recoveries,
-            'local_sales' => $localSales, // Local Sales Data
-            'sale_returns' => $saleReturns,
-            'startDate' => $startDate, // Local Sales Data
-            'endDate' => $endDate, // Local Sales Data
+            'opening_balance' => $openingBalance,
+            'closing_balance' => $closingBalance,
+            'recoveries'      => $recoveries,
+            'local_sales'     => $localSales,
+            'sale_returns'    => $saleReturns,
+            'startDate'       => $startDate,
+            'endDate'         => $endDate,
         ]);
     }
+
+
+
 
 
     public function stock_Record()
@@ -432,6 +504,7 @@ class ReportController extends Controller
 
         $recoveries = [];
 
+        // Distributor Recoveries
         if ($type == 'all' || $type == 'distributor') {
             $query = Recovery::whereBetween('date', [$startDate, $endDate]);
 
@@ -444,16 +517,18 @@ class ReportController extends Controller
             foreach ($distributorRecoveries as $recovery) {
                 $distributor = Distributor::find($recovery->distributor_ledger_id);
                 $recoveries[] = [
-                    'date' => $recovery->date,
-                    'party_name' => $distributor->Customer ?? 'N/A',
-                    'area' => $distributor->Area ?? 'N/A',
-                    'remarks' => $recovery->remarks,
+                    'date'        => $recovery->date,
+                    'shop_name'   => '-', // Distributors ke liye shop name nahi hota
+                    'party_name'  => $distributor->Customer ?? 'N/A',
+                    'area'        => $distributor->Area ?? 'N/A',
+                    'remarks'     => $recovery->remarks,
                     'amount_paid' => number_format($recovery->amount_paid),
-                    'salesman' => $recovery->salesman ?? '-'
+                    'salesman'    => $recovery->salesman ?? '-'
                 ];
             }
         }
 
+        // Customer Recoveries
         if ($type == 'all' || $type == 'customer') {
             $query = CustomerRecovery::whereBetween('date', [$startDate, $endDate]);
 
@@ -466,18 +541,20 @@ class ReportController extends Controller
             foreach ($customerRecoveries as $recovery) {
                 $customer = Customer::find($recovery->customer_ledger_id);
                 $recoveries[] = [
-                    'date' => $recovery->date,
-                    'party_name' => $customer->customer_name ?? 'N/A',
-                    'area' => $customer->area ?? 'N/A',
-                    'remarks' => $recovery->remarks,
+                    'date'        => $recovery->date,
+                    'shop_name'   => $customer->shop_name ?? 'N/A',   // ✅ Shop Name
+                    'party_name'  => $customer->customer_name ?? 'N/A', // ✅ Party = Customer Name
+                    'area'        => $customer->area ?? 'N/A',
+                    'remarks'     => $recovery->remarks,
                     'amount_paid' => number_format($recovery->amount_paid),
-                    'salesman' => $recovery->salesman ?? '-'
+                    'salesman'    => $recovery->salesman ?? '-'
                 ];
             }
         }
 
         return response()->json($recoveries);
     }
+
 
 
     public function date_wise_purcahse_report()

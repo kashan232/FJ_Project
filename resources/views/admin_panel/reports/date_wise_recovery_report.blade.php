@@ -63,6 +63,7 @@
                             <tr>
                                 <th>Voc #</th>
                                 <th>Date</th>
+                                <th>Shopname</th>
                                 <th>Party Name</th>
                                 <th>Area</th>
                                 <th>Remarks</th>
@@ -160,6 +161,7 @@
                             let row = `<tr>
                             <td>${index + 1}</td>
                             <td>${formattedDate}</td>
+                            <td>${item.shop_name}</td>
                             <td>${item.party_name}</td>
                             <td>${item.area}</td>
                             <td>${item.remarks}</td>
@@ -170,11 +172,11 @@
 
                         tableBody.innerHTML += `
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Recovery:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Recovery:</td>
                             <td class="fw-bold">${totalAmount.toLocaleString()}</td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Customers:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Customers:</td>
                             <td class="fw-bold">${data.length}</td>
                         </tr>`;
                     } else {
@@ -205,10 +207,11 @@
 
                         // Group heading
                         tableBody.innerHTML += `
-                        <tr><td colspan="6" class="fw-bold text-primary">Salesman: ${smName}</td></tr>
+                        <tr><td colspan="7" class="fw-bold text-primary">Salesman: ${smName}</td></tr>
                         <tr>
                             <th>Voc #</th>
                             <th>Date</th>
+                            <th>Shopname</th>
                             <th>Party Name</th>
                             <th>Area</th>
                             <th>Remarks</th>
@@ -224,6 +227,7 @@
                             <tr>
                                 <td>${index + 1}</td>
                                 <td>${formattedDate}</td>
+                                <td>${item.shop_name}</td>
                                 <td>${item.party_name}</td>
                                 <td>${item.area}</td>
                                 <td>${item.remarks}</td>
@@ -236,11 +240,11 @@
 
                         tableBody.innerHTML += `
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Recovery:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Recovery:</td>
                             <td class="fw-bold">${total.toLocaleString()}</td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="text-end fw-bold">Total Customers:</td>
+                            <td colspan="6" class="text-end fw-bold">Total Customers:</td>
                             <td class="fw-bold">${rows.length}</td>
                         </tr>
                         <tr><td colspan="6" class="text-center text-muted">------------------------------------------</td></tr>`;
@@ -249,11 +253,11 @@
                     // 👉 FINAL SUMMARY FOOTER
                     tableBody.innerHTML += `
                     <tr>
-                        <td colspan="5" class="text-end fw-bold text-danger">Grand Total Recovery:</td>
+                        <td colspan="6" class="text-end fw-bold text-danger">Grand Total Recovery:</td>
                         <td class="fw-bold text-danger">${totalRecoveryAll.toLocaleString()}</td>
                     </tr>
                     <tr>
-                        <td colspan="5" class="text-end fw-bold text-danger">Grand Total Customers:</td>
+                        <td colspan="6" class="text-end fw-bold text-danger">Grand Total Customers:</td>
                         <td class="fw-bold text-danger">${totalCustomersAll}</td>
                     </tr>`;
                 }

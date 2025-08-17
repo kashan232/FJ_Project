@@ -191,7 +191,9 @@ class PaymentController extends Controller
 
         $amount_paid = $amount; // Just renaming for clarity
         $remarks = 'Cash Received'; // Optional, or fetch from DB if dynamic
-        $date = $request->date;
+        $date = \Carbon\Carbon::parse($request->date)->format('d/m/Y');
+
+
         return view('admin_panel.payments.customer_payment_receipt', [
             'customer' => $customer,
             'amount' => $amount,
@@ -203,7 +205,7 @@ class PaymentController extends Controller
     }
 
 
-    
+
 
     public function Distributor_payments()
     {
@@ -290,7 +292,7 @@ class PaymentController extends Controller
         return view('admin_panel.payments.distributor_payment_receipt', [
             'distributor' => $distributor,
             'amount' => $amount,
-            'date' => $date,distributor_payment_receipt
+            'date' => $date,
             'closing_balance' => $closing_balance
         ]);
     }
